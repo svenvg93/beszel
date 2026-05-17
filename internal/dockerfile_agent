@@ -1,27 +1,35 @@
-FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:bookworm AS builder
 
 WORKDIR /app
 
 COPY ../go.mod ../go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/root/go/pkg/mod go mod download
 
 # Copy source files
 COPY . ./
 
 # Build
 ARG TARGETOS TARGETARCH
-RUN CGO_ENABLED=0 GOGC=75 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags "-w -s" -o /agent ./internal/cmd/agent
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOGC=75 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -tags glibc -ldflags "-w -s" -o /agent ./internal/cmd/agent
 
-RUN rm -rf /tmp/*
+# Fetch smartctl binary
+FROM debian:bookworm-slim AS smartmontools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends smartmontools \
+    && rm -rf /var/lib/apt/lists/*
 
 # --------------------------
-# Final image: default scratch-based agent
+# Final image: distroless (glibc, no shell, small footprint)
+# NVIDIA: use runtime: nvidia — NVML library is injected automatically
+# Intel GPU: mount intel_gpu_top from the host:
+#   volumes: ["/usr/bin/intel_gpu_top:/usr/bin/intel_gpu_top:ro"]
 # --------------------------
-FROM scratch
+FROM gcr.io/distroless/base-debian12
+
 COPY --from=builder /agent /agent
-
-# this is so we don't need to create the /tmp directory in the scratch container
-COPY --from=builder /tmp /tmp
+COPY --from=smartmontools /usr/sbin/smartctl /usr/sbin/smartctl
 
 # AMD GPU name lookup (used by agent on Linux when /usr/share/libdrm/amdgpu.ids is read)
 COPY --from=builder /app/agent/test-data/amdgpu.ids /usr/share/libdrm/amdgpu.ids

@@ -11,16 +11,20 @@ services:
       - 'host.docker.internal:host-gateway'
 
   beszel-agent:
-    image: 'henrygd/beszel-agent' #Add -nvidia for nvidia gpus
+    image: 'henrygd/beszel-agent'
     container_name: 'beszel-agent'
     restart: unless-stopped
     network_mode: host
-    # runtime: nvidia # when using beszel-agent-nvidia
+    # For NVIDIA GPU monitoring uncomment:
+    # runtime: nvidia
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # For Intel GPU monitoring mount intel_gpu_top from the host:
+      # - /usr/bin/intel_gpu_top:/usr/bin/intel_gpu_top:ro
     environment:
       PORT: 45876
       KEY: '...'
       # FILESYSTEM: /dev/sda1 # set to the correct filesystem for disk I/O stats
-      # NVIDIA_VISIBLE_DEVICES: all # when using beszel-agent-nvidia
-      # NVIDIA_DRIVER_CAPABILITIES: utility # when using beszel-agent-nvidia
+      # For NVIDIA GPU monitoring:
+      # NVIDIA_VISIBLE_DEVICES: all
+      # NVIDIA_DRIVER_CAPABILITIES: utility
