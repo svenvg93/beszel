@@ -202,6 +202,8 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	apiAuth.POST("/zfs/refresh", h.refreshZfsData).BindFunc(excludeReadOnlyRole)
 	// get systemd service details
 	apiAuth.GET("/systemd/info", h.getSystemdInfo)
+	// list Ookla speedtest servers for the speedtest server picker
+	apiAuth.GET("/speedtest/servers", h.getSpeedtestServers)
 	// /containers routes
 	if enabled, _ := utils.GetEnv("CONTAINER_DETAILS"); enabled != "false" {
 		// get container logs

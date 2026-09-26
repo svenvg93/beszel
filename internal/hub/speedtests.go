@@ -50,7 +50,7 @@ func bindSpeedtestsEvents(hub *Hub) {
 		if ID != e.Record.Id {
 			newRecord := core.NewRecord(e.Record.Collection())
 			newRecord.Id = ID
-			for _, field := range []string{"system", "server_id", "interval", "enabled"} {
+			for _, field := range []string{"system", "server_id", "server_name", "server_location", "interval", "enabled"} {
 				newRecord.Set(field, e.Record.Get(field))
 			}
 			if err := e.App.Save(newRecord); err != nil {

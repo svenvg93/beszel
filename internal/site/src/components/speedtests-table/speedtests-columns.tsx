@@ -31,6 +31,7 @@ import { $allSystemsById } from "@/lib/stores"
 import { useStore } from "@nanostores/react"
 import { SystemStatus } from "@/lib/enums"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatSpeedtestInterval, getSpeedtestServerLabel } from "@/lib/speedtest-utils"
 import { formatBandwidth } from "@/components/routes/system/charts/speedtest-charts"
@@ -105,7 +106,8 @@ export function getSpeedtestColumns({
 		{
 			id: "server",
 			meta: { label: t`Server` },
-			accessorFn: (record) => getSpeedtestServerLabel(record) || t`Automatic`,
+			// Only the server name; the location is in the sheet and the table filter.
+			accessorFn: (record) => record.server_name || getSpeedtestServerLabel(record) || t`Automatic`,
 			header: ({ column }) => <HeaderButton column={column} name={t`Server`} Icon={GlobeIcon} />,
 			cell: ({ row, getValue }) => {
 				const speedtest = row.original
@@ -122,6 +124,12 @@ export function getSpeedtestColumns({
 							dot
 						)}
 						<span className="truncate">{getValue() as string}</span>
+						{/* Automatic speedtests show the server of the latest run. */}
+						{!speedtest.server_id && speedtest.server_name && (
+							<Badge variant="outline" className="shrink-0 font-normal text-muted-foreground">
+								<Trans>Auto</Trans>
+							</Badge>
+						)}
 					</div>
 				)
 			},

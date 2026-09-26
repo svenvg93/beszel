@@ -43,7 +43,7 @@ func TestSpeedtestServerChangeReplacesRecord(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, generateSpeedtestID(system.Id, 0), record.Id)
 
-	status, body := speedtestAPIRequest(t, hub, user, http.MethodPatch, "/api/collections/speedtests/records/"+record.Id, map[string]any{"server_id": 42})
+	status, body := speedtestAPIRequest(t, hub, user, http.MethodPatch, "/api/collections/speedtests/records/"+record.Id, map[string]any{"server_id": 42, "server_name": "Odido", "server_location": "Amsterdam, Netherlands"})
 	assert.Equal(t, http.StatusOK, status, body)
 
 	records, err := hub.FindAllRecords("speedtests")
@@ -51,6 +51,8 @@ func TestSpeedtestServerChangeReplacesRecord(t *testing.T) {
 	require.Len(t, records, 1)
 	assert.Equal(t, generateSpeedtestID(system.Id, 42), records[0].Id)
 	assert.Equal(t, 42, records[0].GetInt("server_id"))
+	assert.Equal(t, "Odido", records[0].GetString("server_name"))
+	assert.Equal(t, "Amsterdam, Netherlands", records[0].GetString("server_location"))
 	assert.Equal(t, 60, records[0].GetInt("interval"))
 	assert.True(t, records[0].GetBool("enabled"))
 }

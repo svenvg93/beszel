@@ -11,12 +11,12 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PlusIcon } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { SystemMultiSelect } from "@/components/network-monitors-table/monitor-dialog"
+import { AUTOMATIC_SERVER, type SpeedtestServer, SpeedtestServerSelect } from "./speedtest-server-select"
 import { $systems } from "@/lib/stores"
 import { supportsSpeedtests } from "@/lib/utils"
 import { DEFAULT_SPEEDTEST_INTERVAL, formatSpeedtestInterval, SPEEDTEST_INTERVALS } from "@/lib/speedtest-utils"
@@ -80,7 +80,7 @@ function SpeedtestDialogContent({
 	systemId?: string
 	speedtest?: SpeedtestRecord
 }) {
-	const [serverId, setServerId] = useState("")
+	const [server, setServer] = useState<SpeedtestServer>(AUTOMATIC_SERVER)
 	const [interval, setInterval] = useState(String(DEFAULT_SPEEDTEST_INTERVAL))
 	const [loading, setLoading] = useState(false)
 	const [selectedSystemId, setSelectedSystemId] = useState("")
@@ -95,7 +95,11 @@ function SpeedtestDialogContent({
 		if (!open) {
 			return
 		}
-		setServerId(speedtest?.server_id ? String(speedtest.server_id) : "")
+		setServer(
+			speedtest?.server_id
+				? { id: speedtest.server_id, name: speedtest.server_name, location: speedtest.server_location }
+				: AUTOMATIC_SERVER
+		)
 		setInterval(String(speedtest?.interval ?? DEFAULT_SPEEDTEST_INTERVAL))
 		setSelectedSystemId(speedtest?.system ?? "")
 		setSelectedSystemIds(new Set())
@@ -111,7 +115,9 @@ function SpeedtestDialogContent({
 		try {
 			if (!targetSystems.length || !targetSystems[0]) throw new Error("Select at least one system.")
 			const payload = {
-				server_id: serverId.trim() ? Number(serverId) : 0,
+				server_id: server.id,
+				server_name: server.name,
+				server_location: server.location,
 				interval: Number(interval),
 			}
 			if (speedtest) {
@@ -182,22 +188,9 @@ function SpeedtestDialogContent({
 				)}
 				<div className="grid gap-2">
 					<Label htmlFor="speedtest-server">
-						<Trans>Server ID</Trans>
+						<Trans>Server</Trans>
 					</Label>
-					<Input
-						id="speedtest-server"
-						type="number"
-						value={serverId}
-						onChange={(e) => setServerId(e.target.value)}
-						placeholder={t`Automatic`}
-						min={1}
-					/>
-					<p className="text-xs text-muted-foreground">
-						<Trans>
-							Optional. Leave empty to pick the best server automatically. List nearby servers with{" "}
-							<code>speedtest -L</code>.
-						</Trans>
-					</p>
+					<SpeedtestServerSelect id="speedtest-server" value={server} onChange={setServer} disabled={loading} />
 				</div>
 				<div className="grid gap-2">
 					<Label>

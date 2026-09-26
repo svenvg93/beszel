@@ -14,7 +14,7 @@ import (
 
 // speedtestMaxStartDelay caps the initial stagger so long intervals don't
 // postpone the first result for hours after the agent starts.
-const speedtestMaxStartDelay = 10 * time.Minute
+const speedtestMaxStartDelay = 5 * time.Minute
 
 // SpeedtestManager manages scheduled speedtests. Runs are serialized across all
 // speedtests, since concurrent tests would compete for the same bandwidth.

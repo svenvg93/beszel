@@ -4,8 +4,7 @@ package speedtest
 import "github.com/henrygd/beszel/internal/entities/monitor"
 
 // MinInterval is the shortest allowed interval between speedtest runs, in minutes.
-// TODO: restore to 15 before merging; lowered to 1 for testing.
-const MinInterval = 1
+const MinInterval = 15
 
 // Config defines a scheduled speedtest sent from hub to agent.
 type Config struct {
