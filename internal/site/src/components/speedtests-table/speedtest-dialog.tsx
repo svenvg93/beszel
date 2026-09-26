@@ -11,6 +11,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PlusIcon } from "lucide-react"
@@ -19,7 +20,7 @@ import { SystemMultiSelect } from "@/components/network-monitors-table/monitor-d
 import { AUTOMATIC_SERVER, type SpeedtestServer, SpeedtestServerSelect } from "./speedtest-server-select"
 import { $systems } from "@/lib/stores"
 import { supportsSpeedtests } from "@/lib/utils"
-import { DEFAULT_SPEEDTEST_INTERVAL, formatSpeedtestInterval, SPEEDTEST_INTERVALS } from "@/lib/speedtest-utils"
+import { DEFAULT_SPEEDTEST_INTERVAL, MAX_SPEEDTEST_INTERVAL, MIN_SPEEDTEST_INTERVAL } from "@/lib/speedtest-utils"
 import type { SpeedtestRecord } from "@/types"
 
 export function AddSpeedtestDialog({ systemId }: { systemId?: string }) {
@@ -193,29 +194,23 @@ function SpeedtestDialogContent({
 					<SpeedtestServerSelect id="speedtest-server" value={server} onChange={setServer} disabled={loading} />
 				</div>
 				<div className="grid gap-2">
-					<Label>
-						<Trans>Interval</Trans>
+					<Label htmlFor="speedtest-interval">
+						<Trans>Interval (minutes)</Trans>
 					</Label>
-					<Select value={interval} onValueChange={setInterval}>
-						<SelectTrigger>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{SPEEDTEST_INTERVALS.map((minutes) => (
-								<SelectItem key={minutes} value={String(minutes)}>
-									<Trans>Every {formatSpeedtestInterval(minutes)}</Trans>
-								</SelectItem>
-							))}
-							{/* Keep a custom interval set through the API selectable. */}
-							{speedtest && !SPEEDTEST_INTERVALS.some((minutes) => minutes === speedtest.interval) && (
-								<SelectItem value={String(speedtest.interval)}>
-									<Trans>Every {formatSpeedtestInterval(speedtest.interval)}</Trans>
-								</SelectItem>
-							)}
-						</SelectContent>
-					</Select>
+					<Input
+						id="speedtest-interval"
+						type="number"
+						value={interval}
+						onChange={(e) => setInterval(e.target.value)}
+						min={MIN_SPEEDTEST_INTERVAL}
+						max={MAX_SPEEDTEST_INTERVAL}
+						step={1}
+						required
+					/>
 					<p className="text-xs text-muted-foreground">
-						<Trans>Each run uses your full bandwidth for about 30 seconds.</Trans>
+						<Trans>
+							Minimum {MIN_SPEEDTEST_INTERVAL} minutes. Each run uses your full bandwidth for about 30 seconds.
+						</Trans>
 					</p>
 				</div>
 				<DialogFooter>

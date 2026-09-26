@@ -143,6 +143,16 @@ export function getSpeedtestColumns({
 			},
 		},
 		{
+			id: "interval",
+			meta: { label: t`Interval` },
+			accessorFn: (record) => record.interval,
+			invertSorting: true,
+			header: ({ column }) => <HeaderButton column={column} name={t`Interval`} Icon={RefreshCwIcon} />,
+			cell: ({ getValue }) => (
+				<span className="ms-1.5 tabular-nums">{formatSpeedtestInterval(getValue() as number)}</span>
+			),
+		},
+		{
 			id: "download",
 			meta: { label: t`Download` },
 			accessorFn: (record) => record.download,
@@ -185,16 +195,6 @@ export function getSpeedtestColumns({
 				if (!download || loss < 0) return empty
 				return <span className="ms-1.5 tabular-nums">{decimalString(loss, loss >= 10 ? 1 : 2)}%</span>
 			},
-		},
-		{
-			id: "interval",
-			meta: { label: t`Interval` },
-			accessorFn: (record) => record.interval,
-			invertSorting: true,
-			header: ({ column }) => <HeaderButton column={column} name={t`Interval`} Icon={RefreshCwIcon} />,
-			cell: ({ getValue }) => (
-				<span className="ms-1.5 tabular-nums">{formatSpeedtestInterval(getValue() as number)}</span>
-			),
 		},
 		{
 			id: "last_run",

@@ -1,7 +1,8 @@
 import type { SpeedtestRecord } from "@/types"
 
-/** Speedtest interval presets in minutes. */
-export const SPEEDTEST_INTERVALS = [15, 30, 60, 180, 360, 720, 1440] as const
+/** Speedtest interval limits in minutes, matching the speedtests collection. */
+export const MIN_SPEEDTEST_INTERVAL = 15
+export const MAX_SPEEDTEST_INTERVAL = 10080
 
 export const DEFAULT_SPEEDTEST_INTERVAL = 360
 
