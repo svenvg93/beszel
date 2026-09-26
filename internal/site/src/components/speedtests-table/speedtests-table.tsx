@@ -28,7 +28,7 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/compon
 import { useToast } from "@/components/ui/use-toast"
 import { isReadOnlyUser, pb } from "@/lib/api"
 import { SystemStatus } from "@/lib/enums"
-import { $allSystemsById, $direction } from "@/lib/stores"
+import { $allSystemsById, $direction, getUserChartTime } from "@/lib/stores"
 import { cn, formatShortDate, matchesFilterGroups, parseFilterGroups, parseSemVer } from "@/lib/utils"
 import type { ChartData, ChartTimes, SpeedtestRecord } from "@/types"
 import { getSpeedtestColumns } from "./speedtests-columns"
@@ -453,8 +453,11 @@ function SpeedtestSheet({
 	onOpenChange: (open: boolean) => void
 	speedtest: SpeedtestRecord
 }) {
-	// Kept separate from the system charts' time range.
-	const [chartTimeStore] = useState(() => atom<ChartTimes>("1h"))
+	// Start from the user's default chart time, but keep it separate from the system charts' time range.
+	const [chartTimeStore] = useState(() => {
+		const defaultTime = getUserChartTime()
+		return atom<ChartTimes>(defaultTime === "1m" ? "1h" : defaultTime)
+	})
 	const chartTime = useStore(chartTimeStore)
 	const direction = useStore($direction)
 	const system = useStore($allSystemsById)[speedtest.system]
