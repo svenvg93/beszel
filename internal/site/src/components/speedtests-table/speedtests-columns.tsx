@@ -27,7 +27,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { $allSystemsById, $userSettings } from "@/lib/stores"
+import { $allSystemsById } from "@/lib/stores"
 import { useStore } from "@nanostores/react"
 import { SystemStatus } from "@/lib/enums"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -258,8 +258,6 @@ export function getSpeedtestColumns({
 }
 
 function bandwidthCell({ getValue }: { getValue: () => unknown }) {
-	// Re-render when the network unit preference changes.
-	useStore($userSettings, { keys: ["unitNet"] })
 	const value = getValue() as number
 	if (!value) return empty
 	return <span className="ms-1.5 tabular-nums">{formatBandwidth(value)}</span>

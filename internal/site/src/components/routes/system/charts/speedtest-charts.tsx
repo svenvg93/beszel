@@ -1,16 +1,15 @@
 import LineChartDefault from "@/components/charts/line-chart"
 import type { DataPoint } from "@/components/charts/line-chart"
 import { decimalString, formatBytes, toFixedFloat } from "@/lib/utils"
-import { $userSettings } from "@/lib/stores"
+import { Unit } from "@/lib/enums"
 import { useLingui } from "@lingui/react/macro"
-import { useStore } from "@nanostores/react"
 import { ChartCard } from "../chart-card"
 import type { ChartData, SpeedtestStatsRecord } from "@/types"
 import { useMemo } from "react"
 
-/** Format a bandwidth in bytes/s using the user's network unit preference. */
+/** Format a bandwidth in bytes/s as bits per second, the unit speedtests are usually quoted in. */
 export function formatBandwidth(bytesPerSecond: number, short = false) {
-	const { value, unit } = formatBytes(bytesPerSecond, true, $userSettings.get().unitNet, false)
+	const { value, unit } = formatBytes(bytesPerSecond, true, Unit.Bits, false)
 	if (short) return `${toFixedFloat(value, value >= 10 ? 0 : 1)} ${unit}`
 	return `${decimalString(value, value >= 100 ? 1 : 2)} ${unit}`
 }
@@ -28,8 +27,6 @@ function point(label: string, color: number | string, dataKey: DataPoint<Speedte
 
 export function SpeedtestBandwidthChart({ stats, chartData, empty }: SpeedtestChartProps) {
 	const { t } = useLingui()
-	// Re-render when the network unit preference changes.
-	useStore($userSettings, { keys: ["unitNet"] })
 	const dataPoints = useMemo(
 		() => [point(t`Download`, 2, (record) => record.download, 0), point(t`Upload`, 5, (record) => record.upload, 1)],
 		[t]
