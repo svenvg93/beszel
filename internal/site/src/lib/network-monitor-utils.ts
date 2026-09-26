@@ -1,4 +1,10 @@
-import type { MonitorCertInfo, MonitorStats, NetworkMonitorRecord, RawMonitorStatsRecord } from "@/types"
+import type {
+	MonitorCertInfo,
+	MonitorStats,
+	NetworkMonitorRecord,
+	NetworkMonitorStatsRecord,
+	RawMonitorStatsRecord,
+} from "@/types"
 import { toFixedFloat } from "./utils"
 
 /** Derive chart metrics from the counts and response sum stored at every retention tier. */
@@ -12,6 +18,32 @@ export function getMonitorStats(record: RawMonitorStatsRecord): MonitorStats {
 				? toFixedFloat(((record.total_count - record.success_count) / record.total_count) * 100, 2)
 				: 0,
 	}
+}
+
+/**
+ * Return the records that have stats for one monitor, with an empty record inserted wherever
+ * consecutive records are further apart than expected (e.g. while the agent was disconnected),
+ * so charts break the line there instead of drawing across the missing time.
+ */
+export function withMonitorGaps(
+	records: NetworkMonitorStatsRecord[],
+	monitor: Pick<NetworkMonitorRecord, "id" | "interval">,
+	expectedInterval: number
+): NetworkMonitorStatsRecord[] {
+	// long-interval monitors only get a record when a new probe completes
+	const maxGap = Math.max(expectedInterval, monitor.interval * 1000) * 1.5
+	const result: NetworkMonitorStatsRecord[] = []
+	let prevTime = 0
+	for (const record of records) {
+		// skip appendData's gap markers (created: null) and records without this monitor
+		if (record.created == null || !record.stats?.[monitor.id]) continue
+		if (prevTime && record.created - prevTime > maxGap) {
+			result.push({ created: (prevTime + record.created) / 2, stats: {} })
+		}
+		prevTime = record.created
+		result.push(record)
+	}
+	return result
 }
 
 export function getMonitorTarget(monitor: Pick<NetworkMonitorRecord, "target" | "protocol" | "port">) {

@@ -1,7 +1,14 @@
-import { getMonitorTarget } from "@/lib/network-monitor-utils"
-import LineChartDefault from "@/components/charts/line-chart"
+import { getMonitorTarget, withMonitorGaps } from "@/lib/network-monitor-utils"
+import LineChartDefault, { isolatedDot } from "@/components/charts/line-chart"
 import type { DataPoint } from "@/components/charts/line-chart"
-import { decimalString, formatMicroseconds, matchesFilterGroups, parseFilterGroups, toFixedFloat } from "@/lib/utils"
+import {
+	chartTimeData,
+	decimalString,
+	formatMicroseconds,
+	matchesFilterGroups,
+	parseFilterGroups,
+	toFixedFloat,
+} from "@/lib/utils"
 import { $monitorFilter } from "@/lib/stores"
 import { useLingui } from "@lingui/react/macro"
 import { ChartCard, FilterBar } from "../chart-card"
@@ -77,10 +84,17 @@ function MonitorChart({
 		return { dataPoints: points, visibleKeys: visibleIDs }
 	}, [monitors, filter, metric, chartData.chartTime, color])
 
+	// Monitors with different intervals don't share timestamps, so multiple lines need connectNulls.
+	// A single line can break at real gaps instead.
+	const singleMonitor = visibleKeys.length === 1 ? monitors.find((m) => m.id === visibleKeys[0]) : undefined
+
 	const filteredMonitorStats = useMemo(() => {
+		if (singleMonitor) {
+			return withMonitorGaps(monitorStats, singleMonitor, chartTimeData[chartData.chartTime].expectedInterval)
+		}
 		if (!visibleKeys.length) return monitorStats
 		return monitorStats.filter((record) => visibleKeys.some((id) => record.stats?.[id] != null))
-	}, [monitorStats, visibleKeys])
+	}, [monitorStats, visibleKeys, singleMonitor, chartData.chartTime])
 
 	const legend = dataPoints.length < 10 && showFilter
 
@@ -99,7 +113,7 @@ function MonitorChart({
 				customData={filteredMonitorStats}
 				dataPoints={dataPoints}
 				domain={domain ?? ["auto", "auto"]}
-				connectNulls
+				connectNulls={!singleMonitor}
 				tickFormatter={tickFormatter}
 				contentFormatter={contentFormatter}
 				legend={legend}
@@ -124,10 +138,15 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 
 	// only one monitor is relevant for this chart
 	const dataPoints: DataPoint<NetworkMonitorStatsRecord>[] = useMemo(() => {
-		const dataFn = (metric: keyof MonitorStats) => (record: NetworkMonitorStatsRecord) =>
-			record.stats?.[monitor?.id ?? ""]?.[metric] ?? "-"
+		const dataFn = (metric: keyof MonitorStats) => (record: NetworkMonitorStatsRecord) => {
+			const stats = record.stats?.[monitor?.id ?? ""]
+			// no successful probes means no response time, so break the line instead of plotting 0
+			if (stats?.loss === 100) return null
+			return stats?.[metric] ?? null
+		}
 		const avgPoint = {
 			label: "Avg",
+			dot: isolatedDot,
 			dataKey: dataFn("res_avg"),
 			color: 1,
 			order: 0,
@@ -139,6 +158,7 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 		return [
 			{
 				label: "Max",
+				dot: isolatedDot,
 				dataKey: dataFn("res_max"),
 				color: 3,
 				order: 0,
@@ -146,6 +166,7 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 			avgPoint,
 			{
 				label: "Min",
+				dot: isolatedDot,
 				dataKey: dataFn("res_min"),
 				color: 2,
 				order: 2,
@@ -155,8 +176,8 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 
 	const data = useMemo(() => {
 		if (!monitor) return []
-		return monitorStats.filter((record) => record.stats && monitor.id in record.stats)
-	}, [monitor, monitorStats])
+		return withMonitorGaps(monitorStats, monitor, chartTimeData[chartTime].expectedInterval)
+	}, [monitor, monitorStats, chartTime])
 
 	const legend = dataPoints.length > 1
 
@@ -174,7 +195,6 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 				customData={data}
 				dataPoints={dataPoints}
 				domain={["auto", "auto"]}
-				connectNulls
 				legend={legend}
 				tickFormatter={(value) => formatMicroseconds(value, false)}
 				contentFormatter={({ value }) => {
