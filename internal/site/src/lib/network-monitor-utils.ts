@@ -9,15 +9,25 @@ import { toFixedFloat } from "./utils"
 
 /** Derive chart metrics from the counts and response sum stored at every retention tier. */
 export function getMonitorStats(record: RawMonitorStatsRecord): MonitorStats {
+	const success = record.success_count > 0
 	return {
-		res_avg: record.success_count > 0 ? toFixedFloat(record.res_sum / record.success_count, 2) : 0,
-		res_min: record.res_min,
-		res_max: record.res_max,
+		res_avg: success ? toFixedFloat(record.res_sum / record.success_count, 2) : null,
+		res_min: success ? record.res_min : null,
+		res_max: success ? record.res_max : null,
 		loss:
 			record.total_count > 0
 				? toFixedFloat(((record.total_count - record.success_count) / record.total_count) * 100, 2)
 				: 0,
 	}
+}
+
+/**
+ * Realtime stats come from the agent without counts and report 0 response times when every
+ * probe failed; clear them to match stored stats.
+ */
+export function clearFailedResponse(stats: MonitorStats): MonitorStats {
+	if (stats.loss < 100) return stats
+	return { ...stats, res_avg: null, res_min: null, res_max: null }
 }
 
 /**
