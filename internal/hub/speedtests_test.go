@@ -57,6 +57,46 @@ func TestSpeedtestServerChangeReplacesRecord(t *testing.T) {
 	assert.True(t, records[0].GetBool("enabled"))
 }
 
+func TestDuplicateSpeedtestIsRejected(t *testing.T) {
+	hub, testApp, err := createTestHub(t)
+	require.NoError(t, err)
+	defer cleanupTestHub(hub, testApp)
+	bindSpeedtestsEvents(hub)
+
+	user, err := createTestUser(hub)
+	require.NoError(t, err)
+	system, err := createTestRecord(hub, "systems", map[string]any{
+		"name": "Paused", "host": "localhost", "port": "45876",
+		"status": "paused", "users": []string{user.Id},
+	})
+	require.NoError(t, err)
+	create := func(serverID int) (int, string) {
+		return speedtestAPIRequest(t, hub, user, http.MethodPost, "/api/collections/speedtests/records", map[string]any{
+			"system": system.Id, "server_id": serverID, "interval": 60, "enabled": true,
+		})
+	}
+
+	status, body := create(0)
+	require.Equal(t, http.StatusOK, status, body)
+	status, body = create(42)
+	require.Equal(t, http.StatusOK, status, body)
+
+	// Adding the same server to the same system again.
+	status, body = create(42)
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, body, errDuplicateSpeedtest)
+
+	// Switching a speedtest to a server the system already tests against.
+	status, body = speedtestAPIRequest(t, hub, user, http.MethodPatch,
+		"/api/collections/speedtests/records/"+generateSpeedtestID(system.Id, 0), map[string]any{"server_id": 42})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, body, errDuplicateSpeedtest)
+
+	records, err := hub.FindAllRecords("speedtests")
+	require.NoError(t, err)
+	assert.Len(t, records, 2, "the rejected edit must not delete the original speedtest")
+}
+
 func TestRunSpeedtest(t *testing.T) {
 	hub, testApp, err := createTestHub(t)
 	require.NoError(t, err)

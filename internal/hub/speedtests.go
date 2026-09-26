@@ -14,12 +14,30 @@ func generateSpeedtestID(systemID string, serverID uint32) string {
 	return systems.MakeStableHashId(systemID, "speedtest", strconv.FormatUint(uint64(serverID), 10))
 }
 
+// errDuplicateSpeedtest is returned when a system already has a speedtest for the chosen server.
+const errDuplicateSpeedtest = "This system already has a speedtest for this server."
+
+// speedtestExists reports whether a speedtest record with the given ID exists.
+func speedtestExists(app core.App, id string) bool {
+	_, err := app.FindRecordById("speedtests", id)
+	return err == nil
+}
+
 // bindSpeedtestsEvents keeps speedtest records and agent speedtest state in sync.
 func bindSpeedtestsEvents(hub *Hub) {
 	// on create, make sure the id is set to a stable hash
 	hub.OnRecordCreate("speedtests").BindFunc(func(e *core.RecordEvent) error {
 		config := speedtestConfigFromRecord(e.Record)
 		e.Record.Set("id", generateSpeedtestID(e.Record.GetString("system"), config.ServerID))
+		return e.Next()
+	})
+
+	// reject API creates that duplicate an existing speedtest with a clear message
+	hub.OnRecordCreateRequest("speedtests").BindFunc(func(e *core.RecordRequestEvent) error {
+		ID := generateSpeedtestID(e.Record.GetString("system"), speedtestConfigFromRecord(e.Record).ServerID)
+		if speedtestExists(e.App, ID) {
+			return e.BadRequestError(errDuplicateSpeedtest, nil)
+		}
 		return e.Next()
 	})
 
@@ -49,6 +67,9 @@ func bindSpeedtestsEvents(hub *Hub) {
 		systemID := e.Record.GetString("system")
 		ID := generateSpeedtestID(systemID, speedtestConfigFromRecord(e.Record).ServerID)
 		if ID != e.Record.Id {
+			if speedtestExists(e.App, ID) {
+				return e.BadRequestError(errDuplicateSpeedtest, nil)
+			}
 			newRecord := core.NewRecord(e.Record.Collection())
 			newRecord.Id = ID
 			for _, field := range []string{"system", "server_id", "server_name", "server_location", "interval", "enabled"} {
