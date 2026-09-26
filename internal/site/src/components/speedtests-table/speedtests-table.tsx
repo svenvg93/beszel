@@ -176,16 +176,37 @@ export default function SpeedtestsTable({
 		[runBatch, showError]
 	)
 
+	const handleRunNow = useCallback(
+		async (toRun: SpeedtestRecord[]) => {
+			try {
+				for (const speedtest of toRun) {
+					await pb.send("/api/beszel/speedtest/run", { method: "POST", query: { id: speedtest.id } })
+				}
+				toast({
+					title: toRun.length > 1 ? t`Speedtests started` : t`Speedtest started`,
+					description: t`Results appear once the test finishes, usually within a minute or two.`,
+				})
+				if (toRun.length > 1) {
+					setRowSelection({})
+				}
+			} catch (err) {
+				showError(err)
+			}
+		},
+		[showError, toast]
+	)
+
 	const columns = useMemo(() => {
 		let columns = getSpeedtestColumns({
 			onEdit: setEditingSpeedtest,
 			onDelete: handleDeleteRequest,
 			onSetEnabled: handleSetEnabled,
+			onRunNow: handleRunNow,
 		})
 		if (systemId) columns = columns.filter((col) => col.id !== "system")
 		if (!canManage) columns = columns.filter((col) => col.id !== "actions" && col.id !== "select")
 		return columns
-	}, [canManage, handleDeleteRequest, handleSetEnabled, systemId])
+	}, [canManage, handleDeleteRequest, handleSetEnabled, handleRunNow, systemId])
 
 	const table = useReactTable({
 		data: speedtests,
@@ -432,8 +453,8 @@ function SpeedtestSheet({
 	onOpenChange: (open: boolean) => void
 	speedtest: SpeedtestRecord
 }) {
-	// Speedtests run at most every 15 minutes, so default to a week of history.
-	const [chartTimeStore] = useState(() => atom<ChartTimes>("1w"))
+	// Kept separate from the system charts' time range.
+	const [chartTimeStore] = useState(() => atom<ChartTimes>("1h"))
 	const chartTime = useStore(chartTimeStore)
 	const direction = useStore($direction)
 	const system = useStore($allSystemsById)[speedtest.system]

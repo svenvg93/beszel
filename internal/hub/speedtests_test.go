@@ -57,6 +57,54 @@ func TestSpeedtestServerChangeReplacesRecord(t *testing.T) {
 	assert.True(t, records[0].GetBool("enabled"))
 }
 
+func TestRunSpeedtest(t *testing.T) {
+	hub, testApp, err := createTestHub(t)
+	require.NoError(t, err)
+	defer cleanupTestHub(hub, testApp)
+
+	user, err := createTestUser(hub)
+	require.NoError(t, err)
+	readonly, err := createTestRecord(hub, "users", map[string]any{
+		"email": "readonly@test.com", "password": "testtesttest", "role": "readonly",
+	})
+	require.NoError(t, err)
+	other, err := createTestRecord(hub, "users", map[string]any{"email": "other@test.com", "password": "testtesttest"})
+	require.NoError(t, err)
+
+	system, err := createTestRecord(hub, "systems", map[string]any{
+		"name": "Down", "host": "127.0.0.1", "port": "1",
+		"status": "down", "users": []string{user.Id, readonly.Id},
+	})
+	require.NoError(t, err)
+	require.NoError(t, hub.sm.AddRecord(system, nil))
+	enabled, err := createTestRecord(hub, "speedtests", map[string]any{"system": system.Id, "interval": 60, "enabled": true})
+	require.NoError(t, err)
+	paused, err := createTestRecord(hub, "speedtests", map[string]any{"system": system.Id, "server_id": 42, "interval": 60, "enabled": false})
+	require.NoError(t, err)
+
+	handler := speedtestServersMux(t, hub)
+	run := func(user *core.Record, id string) int {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodPost, "/api/beszel/speedtest/run?id="+id, nil)
+		if user != nil {
+			token, err := user.NewAuthToken()
+			require.NoError(t, err)
+			request.Header.Set("Authorization", token)
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		return response.Code
+	}
+
+	assert.Equal(t, http.StatusUnauthorized, run(nil, enabled.Id))
+	assert.Equal(t, http.StatusForbidden, run(readonly, enabled.Id))
+	assert.Equal(t, http.StatusBadRequest, run(user, ""))
+	assert.Equal(t, http.StatusNotFound, run(user, "missing"))
+	assert.Equal(t, http.StatusNotFound, run(other, enabled.Id), "users without access to the system")
+	assert.Equal(t, http.StatusBadRequest, run(user, paused.Id), "paused speedtests")
+	assert.Equal(t, http.StatusBadRequest, run(user, enabled.Id), "systems that are not up")
+}
+
 func speedtestAPIRequest(t *testing.T, hub *Hub, user *core.Record, method, url string, body any) (int, string) {
 	t.Helper()
 	data, err := json.Marshal(body)

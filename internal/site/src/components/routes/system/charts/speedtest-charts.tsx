@@ -1,5 +1,5 @@
-import LineChartDefault from "@/components/charts/line-chart"
-import type { DataPoint } from "@/components/charts/line-chart"
+import AreaChartDefault from "@/components/charts/area-chart"
+import type { DataPoint } from "@/components/charts/area-chart"
 import { decimalString, formatBytes, toFixedFloat } from "@/lib/utils"
 import { Unit } from "@/lib/enums"
 import { useLingui } from "@lingui/react/macro"
@@ -20,9 +20,9 @@ type SpeedtestChartProps = {
 	empty: boolean
 }
 
-// Runs are sparse, so show a dot for each one.
+// Series overlap rather than stack, so a translucent fill keeps each one visible.
 function point(label: string, color: number | string, dataKey: DataPoint<SpeedtestStatsRecord>["dataKey"], order = 0) {
-	return { label, color, dataKey, order, dot: true } satisfies DataPoint<SpeedtestStatsRecord>
+	return { label, color, dataKey, order, opacity: 0.2 } satisfies DataPoint<SpeedtestStatsRecord>
 }
 
 export function SpeedtestBandwidthChart({ stats, chartData, empty }: SpeedtestChartProps) {
@@ -33,7 +33,7 @@ export function SpeedtestBandwidthChart({ stats, chartData, empty }: SpeedtestCh
 	)
 	return (
 		<ChartCard empty={empty} title={t`Bandwidth`} description={t`Download and upload speed`} grid={false} legend>
-			<LineChartDefault
+			<AreaChartDefault
 				truncate
 				chartData={chartData}
 				customData={stats}
@@ -55,7 +55,7 @@ export function SpeedtestLatencyChart({ stats, chartData, empty }: SpeedtestChar
 	)
 	return (
 		<ChartCard empty={empty} title={t`Latency`} description={t`Idle ping and jitter`} grid={false} legend>
-			<LineChartDefault
+			<AreaChartDefault
 				truncate
 				chartData={chartData}
 				customData={stats}
@@ -87,7 +87,7 @@ export function SpeedtestLoadedLatencyChart({ stats, chartData, empty }: Speedte
 			grid={false}
 			legend
 		>
-			<LineChartDefault
+			<AreaChartDefault
 				truncate
 				chartData={chartData}
 				customData={stats}
@@ -119,7 +119,7 @@ export function SpeedtestLossChart({ stats, chartData, empty }: SpeedtestChartPr
 			description={t`Packet loss (%)`}
 			grid={false}
 		>
-			<LineChartDefault
+			<AreaChartDefault
 				truncate
 				chartData={chartData}
 				customData={stats}

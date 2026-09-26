@@ -6,6 +6,7 @@ import {
 	ArrowUpIcon,
 	ClockIcon,
 	ExternalLinkIcon,
+	GaugeIcon,
 	MoreHorizontalIcon,
 	PauseCircleIcon,
 	PenBoxIcon,
@@ -51,6 +52,11 @@ export function getSpeedtestStatusColor(speedtest: SpeedtestRecord, system: Syst
 	return "bg-green-500"
 }
 
+/** Whether a speedtest can run now: it must be active and its system connected. */
+export function canRunSpeedtest(speedtest: SpeedtestRecord, system: SystemRecord | undefined) {
+	return speedtest.enabled && system?.status === SystemStatus.Up
+}
+
 /** Placeholder for values that haven't been measured yet. */
 const empty = <span className="ms-1.5 text-muted-foreground">-</span>
 
@@ -58,10 +64,12 @@ export function getSpeedtestColumns({
 	onEdit,
 	onDelete,
 	onSetEnabled,
+	onRunNow,
 }: {
 	onEdit?: (speedtest: SpeedtestRecord) => void
 	onDelete?: (speedtests: SpeedtestRecord[]) => void | Promise<void>
 	onSetEnabled?: (speedtests: SpeedtestRecord[], enabled: boolean) => void | Promise<void>
+	onRunNow?: (speedtests: SpeedtestRecord[]) => void | Promise<void>
 } = {}): ColumnDef<SpeedtestRecord>[] {
 	return [
 		{
@@ -214,6 +222,8 @@ export function getSpeedtestColumns({
 						: [row.original]
 				const isBulkAction = actionRows.length > 1
 				const shouldPause = actionRows.some((speedtest) => speedtest.enabled)
+				const allSystems = useStore($allSystemsById)
+				const runnableRows = actionRows.filter((speedtest) => canRunSpeedtest(speedtest, allSystems[speedtest.system]))
 				return (
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
@@ -225,6 +235,10 @@ export function getSpeedtestColumns({
 							</Button>
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+							<DropdownMenuItem disabled={!runnableRows.length} onClick={() => onRunNow?.(runnableRows)}>
+								<GaugeIcon className="me-2.5 size-4" />
+								<Trans>Run now</Trans>
+							</DropdownMenuItem>
 							{!isBulkAction && (
 								<DropdownMenuItem onClick={() => onEdit?.(row.original)}>
 									<PenBoxIcon className="me-2.5 size-4" />

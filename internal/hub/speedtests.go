@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"net/http"
 	"strconv"
 
 	"github.com/henrygd/beszel/internal/entities/speedtest"
@@ -99,6 +100,34 @@ func (h *Hub) upsertSpeedtest(record *core.Record, runNow bool) error {
 		return err
 	}
 	return system.UpsertSpeedtest(speedtestConfigFromRecord(record), runNow)
+}
+
+// runSpeedtest handles POST /api/beszel/speedtest/run requests. It starts a run
+// in the background; the result arrives with the agent's next stats.
+func (h *Hub) runSpeedtest(e *core.RequestEvent) error {
+	id := e.Request.URL.Query().Get("id")
+	if id == "" {
+		return e.BadRequestError("Invalid id parameter", nil)
+	}
+	record, err := e.App.FindRecordById("speedtests", id)
+	if err != nil {
+		return e.NotFoundError("", nil)
+	}
+	system, err := h.sm.GetSystem(record.GetString("system"))
+	if err != nil || !system.HasUser(e.App, e.Auth) {
+		return e.NotFoundError("", nil)
+	}
+	// Paused speedtests have no task on the agent, and running one would schedule it.
+	if !record.GetBool("enabled") {
+		return e.BadRequestError("Speedtest is paused.", nil)
+	}
+	if system.Status != "up" {
+		return e.BadRequestError("System is not connected.", nil)
+	}
+	if err := h.upsertSpeedtest(record, true); err != nil {
+		return e.InternalServerError("", err)
+	}
+	return e.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // deleteSpeedtest removes the record's speedtest from its system's agent.
