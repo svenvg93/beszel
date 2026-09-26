@@ -11,7 +11,7 @@ const SPEEDTEST_FIELDS =
 	"id,system,server_id,interval,enabled,download,upload,ping,jitter,loss,download_latency,download_latency_low,download_latency_high,download_jitter,upload_latency,upload_latency_low,upload_latency_high,upload_jitter,ping_low,ping_high,server_name,server_location,isp,url,error,last_run,updated"
 
 const SPEEDTEST_STATS_FIELDS =
-	"speedtest,download,upload,ping,jitter,loss,server_name,created,download_latency,download_latency_low,download_latency_high,download_jitter,upload_latency,upload_latency_low,upload_latency_high,upload_jitter,ping_low,ping_high"
+	"speedtest,download,upload,ping,jitter,loss,server_name,error,created,download_latency,download_latency_low,download_latency_high,download_jitter,upload_latency,upload_latency_low,upload_latency_high,upload_jitter,ping_low,ping_high"
 
 async function fetchSpeedtests(system?: string) {
 	try {

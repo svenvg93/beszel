@@ -23,6 +23,8 @@ export type DataPoint<T = SystemStatsRecord> = {
 	order?: number
 	strokeOpacity?: number
 	activeDot?: boolean
+	/** Draws a dot on each value, so points without neighbors (e.g. between gaps) are visible. */
+	dot?: boolean
 }
 
 export default function AreaChartDefault({
@@ -84,7 +86,7 @@ export default function AreaChartDefault({
 	}, [displayData, displayMaxToggled, isIntersecting, maxToggled, sourceData])
 
 	// Use a stable key derived from data point identities and visual properties
-	const areasKey = dataPoints?.map((d) => `${d.label}:${d.opacity}`).join("\0")
+	const areasKey = dataPoints?.map((d) => `${d.label}:${d.opacity}${d.dot}`).join("\0")
 
 	const Areas = useMemo(() => {
 		return dataPoints?.map((dataPoint, i) => {
@@ -106,6 +108,7 @@ export default function AreaChartDefault({
 					stackId={dataPoint.stackId}
 					order={dataPoint.order || i}
 					activeDot={dataPoint.activeDot ?? true}
+					dot={dataPoint.dot || false}
 				/>
 			)
 		})

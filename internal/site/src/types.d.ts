@@ -748,6 +748,8 @@ export interface SpeedtestRecord {
 /** One successful speedtest run. Bandwidths in bytes/s, latencies in ms. */
 export interface SpeedtestStatsRecord {
 	speedtest: string
+	/** Set when the run failed; measurements are then empty. */
+	error?: string
 	download: number
 	upload: number
 	ping: number

@@ -505,7 +505,6 @@ function SpeedtestSheet({
 							</>
 						)}
 					</SheetDescription>
-					{speedtest.error && <p className="text-sm text-red-500 mt-1">{speedtest.error}</p>}
 				</SheetHeader>
 				<div className="grid xl:grid-cols-2 gap-4">
 					<ChartTimeSelect

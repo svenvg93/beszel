@@ -21,8 +21,17 @@ type SpeedtestChartProps = {
 }
 
 // Series overlap rather than stack, so a translucent fill keeps each one visible.
+// Failed runs have no measurements and plot as gaps. Runs are sparse, and an area
+// needs two neighboring values, so a dot marks each run.
 function point(label: string, color: number | string, dataKey: DataPoint<SpeedtestStatsRecord>["dataKey"], order = 0) {
-	return { label, color, dataKey, order, opacity: 0.2 } satisfies DataPoint<SpeedtestStatsRecord>
+	return {
+		label,
+		color,
+		dataKey: (record: SpeedtestStatsRecord) => (record.error ? null : dataKey(record)),
+		order,
+		opacity: 0.2,
+		dot: true,
+	} satisfies DataPoint<SpeedtestStatsRecord>
 }
 
 export function SpeedtestBandwidthChart({ stats, chartData, empty }: SpeedtestChartProps) {

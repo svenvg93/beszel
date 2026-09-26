@@ -89,8 +89,9 @@ func (sm *SystemManager) GetSpeedtestConfigsForSystem(systemID string) ([]speedt
 }
 
 // updateSpeedtestRecords stores new speedtest results on their speedtests records
-// and adds a speedtest_stats record for each successful run. Results the hub
-// has already stored are skipped by comparing run times.
+// and adds a speedtest_stats record for each run. Failed runs are stored with
+// their error and no measurements, so they show as gaps in the charts. Results
+// the hub has already stored are skipped by comparing run times.
 func (sys *System) updateSpeedtestRecords(app core.App, results map[string]speedtest.Result) error {
 	var statsCollection *core.Collection
 	for id, result := range results {
@@ -106,22 +107,22 @@ func (sys *System) updateSpeedtestRecords(app core.App, results map[string]speed
 		if err := app.SaveNoValidate(record); err != nil {
 			return fmt.Errorf("failed to update speedtest %s: %w", id, err)
 		}
-		if result.Error != "" {
-			continue
-		}
 		if statsCollection == nil {
 			if statsCollection, err = app.FindCachedCollectionByNameOrId("speedtest_stats"); err != nil {
 				return err
 			}
 		}
 		stats := core.NewRecord(statsCollection)
-		stats.Load(speedtestMeasurements(result))
+		if result.Error == "" {
+			stats.Load(speedtestMeasurements(result))
+		}
 		stats.Load(map[string]any{
 			"system":      sys.Id,
 			"speedtest":   id,
 			"created":     result.RunAt,
 			"server_id":   result.ServerID,
 			"server_name": result.ServerName,
+			"error":       result.Error,
 		})
 		if err := app.SaveNoValidate(stats); err != nil {
 			return fmt.Errorf("failed to save speedtest stats %s: %w", id, err)
@@ -131,15 +132,18 @@ func (sys *System) updateSpeedtestRecords(app core.App, results map[string]speed
 }
 
 // setSpeedtestResultFields stores the latest result on a speedtests record.
-// A failed run keeps the previous measurements and only records the error.
+// A failed run clears the measurements, so the record never shows results
+// older than its latest run. The server name and location are kept, since
+// they also describe the server a pinned speedtest uses.
 func setSpeedtestResultFields(record *core.Record, result speedtest.Result) {
 	record.Set("last_run", result.RunAt)
 	record.Set("error", result.Error)
 	record.Set("updated", time.Now().UTC().Format(types.DefaultDateLayout))
+	record.Load(speedtestMeasurements(result))
 	if result.Error != "" {
+		record.Set("url", "")
 		return
 	}
-	record.Load(speedtestMeasurements(result))
 	record.Set("server_name", result.ServerName)
 	record.Set("server_location", result.ServerLocation)
 	record.Set("isp", result.ISP)

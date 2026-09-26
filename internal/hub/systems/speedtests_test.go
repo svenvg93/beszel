@@ -57,20 +57,32 @@ func TestUpdateSpeedtestRecords(t *testing.T) {
 	save(ok)
 	assert.Equal(t, int64(1), statsCount())
 
-	// A failed run records the error but keeps the previous measurements.
-	record = save(speedtest.Result{RunAt: 2000, Error: "no servers"})
+	// A failed run records the error and clears the previous measurements,
+	// but keeps the server name for display.
+	record = save(speedtest.Result{RunAt: 2000, ServerID: 42, Error: "no servers"})
 	assert.Equal(t, 2000, record.GetInt("last_run"))
 	assert.Equal(t, "no servers", record.GetString("error"))
-	assert.Equal(t, 125_000_000.0, record.GetFloat("download"))
-	assert.Equal(t, int64(1), statsCount())
+	assert.Zero(t, record.GetFloat("download"))
+	assert.Zero(t, record.GetFloat("ping"))
+	assert.Empty(t, record.GetString("url"))
+	assert.Equal(t, "Example", record.GetString("server_name"))
+	// Its history row has the error and no measurements.
+	assert.Equal(t, int64(2), statsCount())
+	failed, err := app.FindFirstRecordByFilter("speedtest_stats", "created = 2000")
+	require.NoError(t, err)
+	assert.Equal(t, "no servers", failed.GetString("error"))
+	assert.Equal(t, 42, failed.GetInt("server_id"))
+	assert.Zero(t, failed.GetFloat("download"))
+	assert.Zero(t, failed.GetFloat("ping"))
 
 	// A later successful run clears the error.
 	ok.RunAt = 3000
 	record = save(ok)
 	assert.Empty(t, record.GetString("error"))
-	assert.Equal(t, int64(2), statsCount())
+	assert.Equal(t, int64(3), statsCount())
 	stats, err := app.FindFirstRecordByFilter("speedtest_stats", "created = 3000")
 	require.NoError(t, err)
+	assert.Empty(t, stats.GetString("error"))
 	assert.Equal(t, sys.Id, stats.GetString("system"))
 	assert.Equal(t, 50_000_000.0, stats.GetFloat("upload"))
 	assert.Equal(t, 42, stats.GetInt("server_id"))
