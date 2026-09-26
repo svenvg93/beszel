@@ -154,6 +154,7 @@ func (c *ConnectionManager) Start(serverOptions ServerOptions) error {
 func (c *ConnectionManager) stop() error {
 	_ = c.agent.StopServer()
 	c.agent.monitorManager.Stop()
+	c.agent.speedtestManager.Stop()
 	c.closeWebSocket()
 	c.agent.cleanupSensorShadow()
 	return health.CleanUp()

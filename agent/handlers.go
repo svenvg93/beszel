@@ -9,6 +9,7 @@ import (
 	"github.com/henrygd/beszel/internal/common"
 	"github.com/henrygd/beszel/internal/entities/monitor"
 	"github.com/henrygd/beszel/internal/entities/smart"
+	"github.com/henrygd/beszel/internal/entities/speedtest"
 
 	"log/slog"
 )
@@ -53,6 +54,7 @@ func NewHandlerRegistry() *HandlerRegistry {
 	registry.Register(common.GetSmartData, &GetSmartDataHandler{})
 	registry.Register(common.GetSystemdInfo, &GetSystemdInfoHandler{})
 	registry.Register(common.SyncNetworkMonitors, &SyncNetworkMonitorsHandler{})
+	registry.Register(common.SyncSpeedtests, &SyncSpeedtestsHandler{})
 	registry.Register(common.GetZfsData, &GetZfsDataHandler{})
 
 	return registry
@@ -242,4 +244,18 @@ func (h *SyncNetworkMonitorsHandler) Handle(hctx *HandlerContext) error {
 		return err
 	}
 	return hctx.SendResponse(resp, hctx.RequestID)
+}
+
+// SyncSpeedtestsHandler handles speedtest configuration sync from hub
+type SyncSpeedtestsHandler struct{}
+
+func (h *SyncSpeedtestsHandler) Handle(hctx *HandlerContext) error {
+	var req speedtest.SyncRequest
+	if err := cbor.Unmarshal(hctx.Request.Data, &req); err != nil {
+		return err
+	}
+	if err := hctx.Agent.speedtestManager.HandleSyncRequest(req); err != nil {
+		return err
+	}
+	return hctx.SendResponse(struct{}{}, hctx.RequestID)
 }

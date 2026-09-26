@@ -59,6 +59,8 @@ type System struct {
 
 	// A fresh connection needs a full monitor configuration sync.
 	monitorsNeedSync atomic.Bool
+	// A fresh connection needs a full speedtest configuration sync.
+	speedtestsNeedSync atomic.Bool
 	// Serialize persistence from scheduled updates and resumes through commit.
 	recordsMu sync.Mutex
 	// Protected by recordsMu; realtime reads don't consume probes.
@@ -288,6 +290,12 @@ func (sys *System) createRecords(data *system.CombinedData) (*core.Record, error
 
 		if data.Monitors != nil {
 			if err := sys.updateNetworkMonitorsRecords(txApp, data.Monitors, savedMonitorProbes); err != nil {
+				return err
+			}
+		}
+
+		if len(data.Speedtests) > 0 {
+			if err := sys.updateSpeedtestRecords(txApp, data.Speedtests); err != nil {
 				return err
 			}
 		}
@@ -654,7 +662,7 @@ func (sys *System) request(ctx context.Context, action common.WebSocketAction, r
 	if sys.sshTransport != nil {
 		client := sys.sshTransport.GetClient()
 		if previous := sys.client.Swap(client); client != nil && client != previous {
-			sys.monitorsNeedSync.Store(true)
+			sys.markAgentConfigsNeedSync()
 		}
 		sys.agentVersion = sys.sshTransport.GetAgentVersion()
 	}
@@ -711,7 +719,7 @@ func (sys *System) fetchDataFromAgent(options common.DataRequestOptions) (*syste
 	if sys.WsConn != nil && sys.WsConn.IsConnected() {
 		wsData, err := sys.fetchDataViaWebSocket(options)
 		if err == nil {
-			sys.syncPendingNetworkMonitors()
+			sys.syncPendingAgentConfigs()
 			return wsData, nil
 		}
 		// A slow collection doesn't mean the connection is broken. Closing it
@@ -727,7 +735,7 @@ func (sys *System) fetchDataFromAgent(options common.DataRequestOptions) (*syste
 	if err != nil {
 		return nil, err
 	}
-	sys.syncPendingNetworkMonitors()
+	sys.syncPendingAgentConfigs()
 	return sshData, nil
 }
 
@@ -969,7 +977,7 @@ func (s *System) createSSHClient() error {
 		return err
 	}
 	s.agentVersion, _ = extractAgentVersion(string(client.Conn.ServerVersion()))
-	s.monitorsNeedSync.Store(true)
+	s.markAgentConfigsNeedSync()
 	s.manager.resetFailedSmartFetchState(s.Id)
 	s.manager.resetFailedZfsFetchState(s.Id)
 	return nil

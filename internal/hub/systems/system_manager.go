@@ -355,14 +355,14 @@ func (sm *SystemManager) AddWebSocketSystem(systemId string, agentVersion semver
 	system := sm.NewSystem(systemId)
 	system.WsConn = wsConn
 	system.agentVersion = agentVersion
-	system.monitorsNeedSync.Store(true)
+	system.markAgentConfigsNeedSync()
 
 	if err := sm.AddRecord(systemRecord, system); err != nil {
 		return err
 	}
 
-	// Sync network monitors to the newly connected agent
-	go system.syncPendingNetworkMonitors()
+	// Sync network monitors and speedtests to the newly connected agent
+	go system.syncPendingAgentConfigs()
 
 	return nil
 }

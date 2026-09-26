@@ -26,6 +26,8 @@ const (
 	GetZfsData
 	// Sync network monitor configuration to agent
 	SyncNetworkMonitors
+	// Sync speedtest configuration to agent
+	SyncSpeedtests
 	// Add new actions here...
 )
 

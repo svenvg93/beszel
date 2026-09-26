@@ -1,6 +1,6 @@
 import { memo, useState } from "react"
 import { Trans } from "@lingui/react/macro"
-import { compareSemVer, parseSemVer, supportsNetworkMonitors } from "@/lib/utils"
+import { compareSemVer, parseSemVer, supportsNetworkMonitors, supportsSpeedtests } from "@/lib/utils"
 import type { GPUData } from "@/types"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import InfoBar from "./system/info-bar"
@@ -16,6 +16,7 @@ import { GpuPowerChart, GpuCharts } from "./system/charts/gpu-charts"
 import {
 	LazyContainersTable,
 	LazyNetworkMonitorsTable,
+	LazySpeedtestsTable,
 	LazySmartTable,
 	LazySystemdTable,
 	LazyZfsTable,
@@ -73,6 +74,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 	const hasGpu = hasGpuData || hasGpuPowerData
 	const hasZfs = Object.keys(systemStats.at(-1)?.stats?.z ?? {}).length > 0
 	const hasNetworkMonitors = supportsNetworkMonitors(system)
+	const hasSpeedtests = supportsSpeedtests(system)
 
 	// keep tabsRef in sync for keyboard navigation
 	const tabs = ["core", "network", "disk"]
@@ -164,6 +166,8 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 				{hasSystemd && <LazySystemdTable systemId={system.id} />}
 
 				{hasNetworkMonitors && <LazyNetworkMonitorsTable systemId={system.id} />}
+
+				{hasSpeedtests && <LazySpeedtestsTable systemId={system.id} />}
 			</>
 		)
 	}
@@ -225,6 +229,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 								<WiFiChart system={system} {...coreProps} />
 							</div>
 							{hasNetworkMonitors && <LazyNetworkMonitorsTable systemId={system.id} />}
+							{hasSpeedtests && <LazySpeedtestsTable systemId={system.id} />}
 						</>
 					)}
 				</TabsContent>
