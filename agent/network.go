@@ -261,3 +261,35 @@ func skipNetworkInterface(v psutilNet.IOCountersStat, nicCfg *NicConfig) bool {
 		return false
 	}
 }
+
+// updateTcpConnections populates systemStats.TcpConnections with TCP socket
+// counts by state. Listing connections walks every socket (and on Linux every
+// process fd table), so only refresh on the default interval. Real-time
+// requests reuse the last snapshot.
+func (a *Agent) updateTcpConnections(cacheTimeMs uint16, systemStats *system.Stats) {
+	if cacheTimeMs == defaultDataCacheTimeMs {
+		if conns, err := psutilNet.Connections("tcp"); err == nil {
+			a.tcpConnections = countTcpConnections(conns)
+		} else {
+			slog.Debug("Error getting tcp connections", "err", err)
+		}
+	}
+	systemStats.TcpConnections = a.tcpConnections
+}
+
+// countTcpConnections returns [established, time_wait, total, close_wait] socket counts.
+func countTcpConnections(conns []psutilNet.ConnectionStat) [4]uint32 {
+	var counts [4]uint32
+	for _, conn := range conns {
+		switch conn.Status {
+		case "ESTABLISHED":
+			counts[0]++
+		case "TIME_WAIT":
+			counts[1]++
+		case "CLOSE_WAIT":
+			counts[3]++
+		}
+	}
+	counts[2] = uint32(len(conns))
+	return counts
+}

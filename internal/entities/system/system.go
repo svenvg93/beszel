@@ -64,6 +64,7 @@ type Stats struct {
 	ZfsPools          map[string]*ZfsPool  `json:"z,omitempty" cbor:"39,keyasint,omitempty"`  // ZFS pool metrics, keyed by pool name
 	DiskIOTotal       [2]uint64            `json:"diot,omitzero" cbor:"38,keyasint,omitzero"` // [total read bytes, total write bytes] cumulative device counters
 	WiFi              map[string]int8      `json:"wf,omitempty" cbor:"40,keyasint,omitempty"` // RSSI dBm keyed by interface; unavailable readings omitted
+	TcpConnections    [4]uint32            `json:"tcp,omitzero" cbor:"41,keyasint,omitzero"`  // [established, time_wait, total, close_wait]
 
 }
 

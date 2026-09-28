@@ -313,6 +313,22 @@ func TestAverageSystemStatsSlice_Fans(t *testing.T) {
 	assert.Equal(t, uint16(1_500), result.Fans["case"])
 }
 
+func TestAverageSystemStatsSlice_TcpConnections(t *testing.T) {
+	input := []system.Stats{
+		{TcpConnections: [4]uint32{10, 4, 20, 2}},
+		{TcpConnections: [4]uint32{15, 7, 31, 5}},
+		{
+			// No tcp data (older agent) - should not affect averaging
+			Cpu: 30.0,
+		},
+	}
+
+	result := records.AverageSystemStatsSlice(input)
+
+	assert.Equal(t, [4]uint32{13, 6, 26, 4}, result.TcpConnections)
+	assert.Equal(t, [4]uint32{}, records.AverageSystemStatsSlice([]system.Stats{{}, {}}).TcpConnections)
+}
+
 func TestAverageSystemStatsSlice_NetworkInterfaces(t *testing.T) {
 	input := []system.Stats{
 		{

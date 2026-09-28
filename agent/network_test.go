@@ -511,3 +511,24 @@ func TestApplyNetworkTotals(t *testing.T) {
 		})
 	}
 }
+
+func TestCountTcpConnections(t *testing.T) {
+	conns := []psutilNet.ConnectionStat{
+		{Status: "ESTABLISHED"},
+		{Status: "ESTABLISHED"},
+		{Status: "TIME_WAIT"},
+		{Status: "LISTEN"},
+		{Status: "CLOSE_WAIT"},
+	}
+	assert.Equal(t, [4]uint32{2, 1, 5, 1}, countTcpConnections(conns))
+	assert.Equal(t, [4]uint32{}, countTcpConnections(nil))
+}
+
+// TestUpdateTcpConnectionsRealtimeReusesSnapshot verifies that non-default
+// intervals don't list connections and reuse the last default-interval counts.
+func TestUpdateTcpConnectionsRealtimeReusesSnapshot(t *testing.T) {
+	a := &Agent{tcpConnections: [4]uint32{7, 3, 12, 2}}
+	var stats system.Stats
+	a.updateTcpConnections(1000, &stats)
+	assert.Equal(t, [4]uint32{7, 3, 12, 2}, stats.TcpConnections)
+}

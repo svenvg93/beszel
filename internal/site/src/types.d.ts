@@ -170,6 +170,8 @@ export interface SystemStats {
 	bats?: Record<string, number>
 	/** Wi-Fi RSSI (dBm) by interface */
 	wf?: Record<string, number>
+	/** tcp connection counts [established, time_wait, total, close_wait] */
+	tcp?: [number, number, number, number?]
 	/** network interfaces [upload bytes, download bytes, total upload bytes, total download bytes] */
 	ni?: Record<string, [number, number, number, number]>
 }
