@@ -271,6 +271,8 @@ export interface ZfsPoolRecord extends RecordModel {
 }
 
 export interface ExtraFsStats {
+	/** display name (set when the key is a filesystem UUID) */
+	n?: string
 	/** disk size (gb) */
 	d: number
 	/** disk used (gb) */

@@ -122,6 +122,8 @@ type FsStats struct {
 	Root           bool    `json:"-"`
 	Mountpoint     string  `json:"-"`
 	Name           string  `json:"-"`
+	UUID           string  `json:"-" cbor:"-"`                               // filesystem UUID, used as the stable key for hubs that support it
+	Label          string  `json:"n,omitempty" cbor:"11,keyasint,omitempty"` // display name when the key is a UUID
 	DiskTotal      float64 `json:"d" cbor:"0,keyasint"`
 	DiskUsed       float64 `json:"du" cbor:"1,keyasint"`
 	TotalRead      uint64  `json:"tr,omitzero" cbor:"9,keyasint,omitzero"`  // cumulative device read bytes
@@ -211,6 +213,9 @@ type Details struct {
 	MemoryTotal   uint64        `cbor:"9,keyasint"`
 	SmartInterval time.Duration `cbor:"10,keyasint,omitempty"`
 	ZfsInterval   time.Duration `cbor:"11,keyasint,omitempty"` // interval for ZFS detail refresh
+	// FsKeyRenames maps legacy extra filesystem keys to their UUID keys so the
+	// hub can move stored history to the new keys.
+	FsKeyRenames map[string]string `cbor:"12,keyasint,omitempty"`
 }
 
 // Final data structure to return to the hub

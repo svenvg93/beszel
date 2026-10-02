@@ -243,24 +243,51 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 			continue
 		}
 		if stats.DiskTotal > 0 {
-			// Use custom name if available, otherwise use device name
-			key := name
-			if stats.Name != "" {
-				key = stats.Name
-			}
+			key := extraFsKey(name, stats, options.UuidDiskKeys)
 			data.Stats.ExtraFs[key] = stats
-			// Add percentages to Info struct for dashboard
-			if stats.DiskTotal > 0 {
-				pct := utils.TwoDecimals((stats.DiskUsed / stats.DiskTotal) * 100)
-				data.Info.ExtraFsPct[key] = pct
+			// Add percentages to Info struct for dashboard. The table only shows
+			// these, so key them by display name rather than by UUID.
+			infoKey := key
+			if options.UuidDiskKeys && stats.Label != "" {
+				if _, taken := data.Info.ExtraFsPct[stats.Label]; !taken {
+					infoKey = stats.Label
+				}
 			}
+			data.Info.ExtraFsPct[infoKey] = utils.TwoDecimals((stats.DiskUsed / stats.DiskTotal) * 100)
 		}
 	}
 	slog.Debug("Extra FS", "data", data.Stats.ExtraFs)
 
 	a.cache.Set(data, cacheTimeMs)
 
-	return a.attachSystemDetails(data, cacheTimeMs, options.IncludeDetails)
+	return a.attachSystemDetails(data, cacheTimeMs, options.IncludeDetails, options.UuidDiskKeys)
+}
+
+// extraFsKey returns the response key of a tracked extra filesystem: its UUID
+// for hubs that support UUID keys, otherwise the custom name or I/O device.
+func extraFsKey(ioKey string, stats *system.FsStats, uuidKeys bool) string {
+	if uuidKeys && stats.UUID != "" {
+		return stats.UUID
+	}
+	if stats.Name != "" {
+		return stats.Name
+	}
+	return ioKey
+}
+
+// extraFsKeyRenames maps the legacy key of each extra filesystem with a UUID
+// to that UUID, so the hub can move stored history to the new key.
+func (a *Agent) extraFsKeyRenames() map[string]string {
+	renames := make(map[string]string)
+	for ioKey, stats := range a.fsStats {
+		if stats.Root || stats.UUID == "" {
+			continue
+		}
+		if legacy := extraFsKey(ioKey, stats, false); legacy != stats.UUID {
+			renames[legacy] = stats.UUID
+		}
+	}
+	return renames
 }
 
 // Start initializes and starts the agent with optional WebSocket connection

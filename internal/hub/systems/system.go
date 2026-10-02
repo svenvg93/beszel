@@ -165,7 +165,8 @@ func (sys *System) update() error {
 		return nil
 	}
 	options := common.DataRequestOptions{
-		CacheTimeMs: uint16(interval),
+		CacheTimeMs:  uint16(interval),
+		UuidDiskKeys: true,
 	}
 	// fetch system details if not already fetched
 	if !sys.detailsFetched.Load() {
@@ -187,6 +188,11 @@ func (sys *System) update() error {
 	// if details were included and fetched successfully, mark details as fetched and update smart interval if set by agent
 	if err == nil && data.Details != nil {
 		sys.detailsFetched.Store(true)
+		if len(data.Details.FsKeyRenames) > 0 {
+			if err := migrateExtraFsKeys(sys.manager.hub, sys.Id, data.Details.FsKeyRenames); err != nil {
+				sys.manager.hub.Logger().Error("Failed to migrate disk keys", "system", sys.Id, "err", err)
+			}
+		}
 		// update smart interval if it's set on the agent side
 		if data.Details.SmartInterval > 0 {
 			sys.smartInterval = data.Details.SmartInterval

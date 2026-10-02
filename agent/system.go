@@ -121,14 +121,18 @@ func (a *Agent) refreshSystemDetails() {
 }
 
 // attachSystemDetails returns details only for fresh default-interval responses.
-func (a *Agent) attachSystemDetails(data *system.CombinedData, cacheTimeMs uint16, includeRequested bool) *system.CombinedData {
+func (a *Agent) attachSystemDetails(data *system.CombinedData, cacheTimeMs uint16, includeRequested, uuidDiskKeys bool) *system.CombinedData {
 	if cacheTimeMs != defaultDataCacheTimeMs || (!includeRequested && !a.detailsDirty) {
 		return data
 	}
 
 	// copy data to avoid adding details to the original cached struct
 	response := *data
-	response.Details = &a.systemDetails
+	details := a.systemDetails
+	if uuidDiskKeys {
+		details.FsKeyRenames = a.extraFsKeyRenames()
+	}
+	response.Details = &details
 	a.detailsDirty = false
 	return &response
 }

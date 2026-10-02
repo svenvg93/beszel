@@ -152,3 +152,7 @@ func (s *System) CreateRecords(data *entities.CombinedData) (*core.Record, error
 func CreateSystemdStatsRecords(app core.App, data []*systemd.Service, systemId string) error {
 	return createSystemdStatsRecords(app, data, systemId)
 }
+
+func MigrateExtraFsKeys(app core.App, systemId string, renames map[string]string) error {
+	return migrateExtraFsKeys(app, systemId, renames)
+}

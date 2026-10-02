@@ -70,6 +70,8 @@ type FingerprintResponse struct {
 type DataRequestOptions struct {
 	CacheTimeMs    uint16 `cbor:"0,keyasint"`
 	IncludeDetails bool   `cbor:"1,keyasint"`
+	// UuidDiskKeys asks the agent to key extra filesystems by filesystem UUID.
+	UuidDiskKeys bool `cbor:"2,keyasint,omitempty"`
 }
 
 type ZfsDataRequest struct {

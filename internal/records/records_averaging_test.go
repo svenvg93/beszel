@@ -345,6 +345,7 @@ func TestAverageSystemStatsSlice_ExtraFs(t *testing.T) {
 			Cpu: 10.0,
 			ExtraFs: map[string]*system.FsStats{
 				"/data": {
+					Label:             "old-name",
 					DiskTotal:         1000.0,
 					DiskUsed:          400.0,
 					DiskReadPs:        50.0,
@@ -364,6 +365,7 @@ func TestAverageSystemStatsSlice_ExtraFs(t *testing.T) {
 			Cpu: 20.0,
 			ExtraFs: map[string]*system.FsStats{
 				"/data": {
+					Label:             "/data",
 					DiskTotal:         1000.0,
 					DiskUsed:          600.0,
 					DiskReadPs:        150.0,
@@ -386,6 +388,7 @@ func TestAverageSystemStatsSlice_ExtraFs(t *testing.T) {
 	require.NotNil(t, result.ExtraFs)
 	require.NotNil(t, result.ExtraFs["/data"])
 	fs := result.ExtraFs["/data"]
+	assert.Equal(t, "/data", fs.Label, "keeps the latest label")
 	assert.Equal(t, 1000.0, fs.DiskTotal)
 	assert.Equal(t, 500.0, fs.DiskUsed)
 	assert.Equal(t, 100.0, fs.DiskReadPs)

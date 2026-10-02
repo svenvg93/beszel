@@ -18,6 +18,10 @@ const diosMax =
 	(i: number) =>
 	({ stats }: SystemStatsRecord) =>
 		stats?.diosm?.[i] ?? 0
+// Display name of an extra filesystem, which may be keyed by UUID
+const extraFsLabel = (systemStats: SystemStatsRecord[] | undefined, key: string) =>
+	systemStats?.at(-1)?.stats.efs?.[key]?.n || key
+
 const extraDios =
 	(name: string, i: number) =>
 	({ stats }: SystemStatsRecord) =>
@@ -126,8 +130,9 @@ export function DiskUsageChart({ systemData, extraFsName }: { systemData: System
 
 	const rootName = systemData.system?.info?.rdn
 	const rootLabel = rootName ?? t({ message: `Root`, context: "Root disk label" })
-	const title = extraFsName ? `${extraFsName} ${t`Usage`}` : `${rootLabel} ${t`Usage`}`
-	const description = t`Disk usage of ${{extraFsName: extraFsName ?? rootLabel.toLowerCase()}}`
+	const diskLabel = extraFsName ? extraFsLabel(chartData.systemStats, extraFsName) : undefined
+	const title = diskLabel ? `${diskLabel} ${t`Usage`}` : `${rootLabel} ${t`Usage`}`
+	const description = t`Disk usage of ${{ extraFsName: diskLabel ?? rootLabel.toLowerCase() }}`
 
 	return (
 		<ChartCard empty={dataEmpty} grid={grid} title={title} description={description}>
@@ -166,8 +171,9 @@ export function DiskIOChart({ systemData, extraFsName }: { systemData: SystemDat
 
 	const rootName = systemData.system?.info?.rdn
 	const rootLabel = rootName ?? t({ message: `Root`, context: "Root disk label" })
-	const title = t`${{diskName: extraFsName ?? rootLabel}} I/O`
-	const description = t`Throughput of ${{extraFsName: extraFsName ?? rootLabel.toLowerCase()}}`
+	const diskLabel = extraFsName ? extraFsLabel(chartData.systemStats, extraFsName) : undefined
+	const title = t`${{ diskName: diskLabel ?? rootLabel }} I/O`
+	const description = t`Throughput of ${{ extraFsName: diskLabel ?? rootLabel.toLowerCase() }}`
 
 	const hasMoreIOMetrics = chartData.systemStats?.some((record) => record.stats?.dios?.at(0))
 
@@ -276,20 +282,22 @@ export function ExtraFsCharts({ systemData }: { systemData: SystemData }) {
 
 	return (
 		<div className="grid xl:grid-cols-2 gap-4">
-			{Object.keys(extraFs).sort((a, b) => a.localeCompare(b)).map((extraFsName) => {
-				let diskSize = systemStats.at(-1)?.stats.efs?.[extraFsName].d ?? NaN
-				// round to nearest GB
-				if (diskSize >= 100) {
-					diskSize = Math.round(diskSize)
-				}
-				return (
-					<div key={extraFsName} className="contents">
-						<DiskUsageChart systemData={systemData} extraFsName={extraFsName} />
+			{Object.keys(extraFs)
+				.sort((a, b) => extraFsLabel(systemStats, a).localeCompare(extraFsLabel(systemStats, b)))
+				.map((extraFsName) => {
+					let diskSize = systemStats.at(-1)?.stats.efs?.[extraFsName].d ?? NaN
+					// round to nearest GB
+					if (diskSize >= 100) {
+						diskSize = Math.round(diskSize)
+					}
+					return (
+						<div key={extraFsName} className="contents">
+							<DiskUsageChart systemData={systemData} extraFsName={extraFsName} />
 
-						<DiskIOChart systemData={systemData} extraFsName={extraFsName} />
-					</div>
-				)
-			})}
+							<DiskIOChart systemData={systemData} extraFsName={extraFsName} />
+						</div>
+					)
+				})}
 		</div>
 	)
 }

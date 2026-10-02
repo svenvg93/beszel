@@ -5,8 +5,10 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +36,8 @@ type diskDiscovery struct {
 	partitions     []disk.PartitionStat
 	usageFn        func(string) (*disk.UsageStat, error)
 	ctx            fsRegistrationContext
+	uuids          map[string]string // block device name -> filesystem UUID
+	excludes       []string          // EXCLUDE_FILESYSTEMS patterns for auto-discovered disks
 }
 
 // prevDisk stores previous per-device disk counters for a given cache interval
@@ -179,17 +183,64 @@ func registerFilesystemStats(existing map[string]*system.FsStats, device, mountp
 // key and reports whether it was added. The key selection itself lives in
 // registerFilesystemStats so that logic can stay directly unit-tested.
 func (d *diskDiscovery) addFsStat(device, mountpoint string, root bool, customName string) bool {
+	return d.addFsStatWithLabel(device, mountpoint, root, customName, "")
+}
+
+// addFsStatWithLabel is addFsStat with an explicit display label. Without one,
+// the label is the custom name or the legacy key, so the name shown in the UI
+// stays the same when the hub switches to UUID keys.
+func (d *diskDiscovery) addFsStatWithLabel(device, mountpoint string, root bool, customName, label string) bool {
 	key, fsStats, ok := registerFilesystemStats(d.agent.fsStats, device, mountpoint, root, customName, d.ctx)
 	if !ok {
 		return false
 	}
-	d.agent.fsStats[key] = fsStats
-	name := key
-	if customName != "" {
-		name = customName
+	fsStats.UUID = d.uuidFor(device, key)
+	// The same filesystem can be mounted more than once (bind mounts, btrfs
+	// subvolumes); track it only once.
+	if fsStats.UUID != "" && d.trackedUUID(fsStats.UUID) {
+		return false
 	}
-	slog.Info("Detected disk", "name", name, "device", device, "mount", mountpoint, "io", key, "root", root)
+	if label == "" {
+		label = customName
+	}
+	if label == "" {
+		label = key
+	}
+	fsStats.Label = label
+	d.agent.fsStats[key] = fsStats
+	slog.Info("Detected disk", "name", label, "device", device, "mount", mountpoint, "io", key, "uuid", fsStats.UUID, "root", root)
 	return true
+}
+
+// uuidFor returns the filesystem UUID of a device, trying its name, its
+// symlink target (e.g. /dev/mapper/vg-lv -> dm-3) and then its I/O key.
+func (d *diskDiscovery) uuidFor(device, ioKey string) string {
+	if len(d.uuids) == 0 {
+		return ""
+	}
+	candidates := []string{filepath.Base(device)}
+	if filepath.IsAbs(device) {
+		if resolved, err := evalSymlinks(device); err == nil {
+			candidates = append(candidates, filepath.Base(resolved))
+		}
+	}
+	candidates = append(candidates, ioKey)
+	for _, name := range candidates {
+		if uuid, ok := d.uuids[name]; ok && name != "" {
+			return uuid
+		}
+	}
+	return ""
+}
+
+// trackedUUID reports whether a filesystem with this UUID is already tracked.
+func (d *diskDiscovery) trackedUUID(uuid string) bool {
+	for _, stats := range d.agent.fsStats {
+		if stats.UUID == uuid {
+			return true
+		}
+	}
+	return false
 }
 
 // addConfiguredRootFs resolves FILESYSTEM against partitions first, then falls
@@ -333,6 +384,92 @@ func (d *diskDiscovery) addExtraFilesystemFolders(folderNames []string) {
 	}
 }
 
+// autoDiscoverSkipMounts are mount trees that never hold user data disks.
+var autoDiscoverSkipMounts = []string{"/boot", "/proc", "/sys", "/dev", "/run", "/snap", "/var/lib/docker", "/var/lib/containers"}
+
+// isAutoDiscoverCandidate reports whether a partition looks like a real data
+// filesystem worth tracking without configuration.
+func isAutoDiscoverCandidate(p disk.PartitionStat, rootMountPoint, efPath string) bool {
+	if !strings.HasPrefix(p.Device, "/dev/") || p.Mountpoint == rootMountPoint || isDockerSpecialMountpoint(p.Mountpoint) {
+		return false
+	}
+	switch p.Fstype {
+	case "squashfs", "iso9660", "erofs":
+		return false
+	}
+	base := filepath.Base(p.Device)
+	for _, prefix := range []string{"loop", "zram", "ram", "sr"} {
+		if strings.HasPrefix(base, prefix) {
+			return false
+		}
+	}
+	if isUnderMount(p.Mountpoint, efPath) {
+		return false
+	}
+	for _, skip := range autoDiscoverSkipMounts {
+		if isUnderMount(p.Mountpoint, skip) {
+			return false
+		}
+	}
+	return true
+}
+
+// isUnderMount reports whether mountpoint is dir or lies below it.
+func isUnderMount(mountpoint, dir string) bool {
+	return mountpoint == dir || strings.HasPrefix(mountpoint, dir+"/")
+}
+
+// isExcludedFilesystem matches EXCLUDE_FILESYSTEMS patterns against a
+// filesystem's mountpoint, device name and UUID.
+func isExcludedFilesystem(patterns []string, mountpoint, device, uuid string) bool {
+	for _, pattern := range patterns {
+		for _, value := range []string{mountpoint, filepath.Base(device), uuid} {
+			if match, _ := path.Match(pattern, value); match || pattern == value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// addAutoDiscoveredFs tracks mounted filesystems that have a UUID and are not
+// configured yet, so extra disks show up without EXTRA_FILESYSTEMS.
+func (d *diskDiscovery) addAutoDiscoveredFs() {
+	if len(d.uuids) == 0 {
+		return
+	}
+	// The root filesystem may be tracked under a key without a UUID (e.g. the
+	// last-resort fallback), so mark its UUID as seen explicitly.
+	seen := make(map[string]bool)
+	candidates := make([]disk.PartitionStat, 0, len(d.partitions))
+	for _, p := range d.partitions {
+		if p.Mountpoint == d.rootMountPoint {
+			if uuid := d.uuidFor(p.Device, ""); uuid != "" {
+				seen[uuid] = true
+			}
+		}
+		if isAutoDiscoverCandidate(p, d.rootMountPoint, d.ctx.efPath) {
+			candidates = append(candidates, p)
+		}
+	}
+	// Prefer the top-level mount when one filesystem is mounted in several places.
+	slices.SortStableFunc(candidates, func(a, b disk.PartitionStat) int {
+		return len(a.Mountpoint) - len(b.Mountpoint)
+	})
+	for _, p := range candidates {
+		uuid := d.uuidFor(p.Device, "")
+		if uuid == "" || seen[uuid] {
+			continue
+		}
+		seen[uuid] = true
+		if isExcludedFilesystem(d.excludes, p.Mountpoint, p.Device, uuid) {
+			slog.Info("Excluded disk", "device", p.Device, "mount", p.Mountpoint, "uuid", uuid)
+			continue
+		}
+		d.addFsStatWithLabel(p.Device, p.Mountpoint, false, "", p.Mountpoint)
+	}
+}
+
 // Sets up the filesystems to monitor for disk usage and I/O.
 func (a *Agent) initializeDiskInfo() {
 	filesystemRaw, _ := utils.GetEnv("FILESYSTEM")
@@ -373,6 +510,14 @@ func (a *Agent) initializeDiskInfo() {
 		partitions:     partitions,
 		usageFn:        disk.Usage,
 		ctx:            ctx,
+		uuids:          readFsUUIDs(),
+	}
+	if excludes, exists := utils.GetEnv("EXCLUDE_FILESYSTEMS"); exists {
+		for pattern := range strings.SplitSeq(excludes, ",") {
+			if pattern = strings.TrimSpace(pattern); pattern != "" {
+				discovery.excludes = append(discovery.excludes, pattern)
+			}
+		}
 	}
 
 	hasRoot = discovery.addConfiguredRootFs()
@@ -406,6 +551,8 @@ func (a *Agent) initializeDiskInfo() {
 	if !hasRoot {
 		discovery.addLastResortRootFs()
 	}
+
+	discovery.addAutoDiscoveredFs()
 
 	a.pruneDuplicateRootExtraFilesystems()
 	a.initializeDiskIoStats(diskIoCounters)

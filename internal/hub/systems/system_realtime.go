@@ -163,7 +163,7 @@ func (sm *SystemManager) fetchRealtimeDataAndNotify() {
 		}
 		go func(fetch realtimeFetch) {
 			defer sm.finishRealtimeFetch(fetch)
-			data, err := system.fetchDataFromAgent(common.DataRequestOptions{CacheTimeMs: 1000})
+			data, err := system.fetchDataFromAgent(common.DataRequestOptions{CacheTimeMs: 1000, UuidDiskKeys: true})
 			if err != nil {
 				return
 			}

@@ -408,6 +408,9 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 					sum.ExtraFs[key] = &system.FsStats{}
 				}
 				fs := sum.ExtraFs[key]
+				if value.Label != "" {
+					fs.Label = value.Label
+				}
 				fs.DiskTotal += value.DiskTotal
 				fs.DiskUsed += value.DiskUsed
 				fs.DiskWritePs += value.DiskWritePs

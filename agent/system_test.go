@@ -101,12 +101,12 @@ func TestUpdateSystemDetailsMarksDetailsDirty(t *testing.T) {
 	assert.True(t, agent.systemDetails.Podman)
 
 	original := &system.CombinedData{}
-	realTimeResponse := agent.attachSystemDetails(original, 1000, true)
+	realTimeResponse := agent.attachSystemDetails(original, 1000, true, false)
 	assert.Same(t, original, realTimeResponse)
 	assert.Nil(t, realTimeResponse.Details)
 	assert.True(t, agent.detailsDirty)
 
-	response := agent.attachSystemDetails(original, defaultDataCacheTimeMs, false)
+	response := agent.attachSystemDetails(original, defaultDataCacheTimeMs, false, false)
 	require.NotNil(t, response.Details)
 	assert.NotSame(t, original, response)
 	assert.Equal(t, "updated-host", response.Details.Hostname)
