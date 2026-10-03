@@ -235,5 +235,5 @@ export default function LineChartDefault({
 				</LineChart>
 			</ChartContainer>
 		)
-	}, [displayData, yAxisWidth, hasRightAxis, filter, Lines, XAxis, chartSync.mode])
+	}, [displayData, yAxisWidth, hasRightAxis, filter, Lines, XAxis, chartSync])
 }

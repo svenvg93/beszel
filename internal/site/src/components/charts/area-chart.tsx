@@ -178,5 +178,5 @@ export default function AreaChartDefault({
 				</AreaChart>
 			</ChartContainer>
 		)
-	}, [displayData, yAxisWidth, filter, Areas, XAxis, chartSync.mode])
+	}, [displayData, yAxisWidth, filter, Areas, XAxis, chartSync])
 }
