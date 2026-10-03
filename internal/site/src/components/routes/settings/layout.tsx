@@ -8,6 +8,7 @@ import {
 	FileSlidersIcon,
 	FingerprintIcon,
 	HeartPulseIcon,
+	NetworkIcon,
 	SettingsIcon,
 } from "lucide-react"
 import { lazy, useEffect } from "react"
@@ -26,6 +27,7 @@ const configYamlSettingsImport = () => import("./config-yaml.tsx")
 const fingerprintsSettingsImport = () => import("./tokens-fingerprints.tsx")
 const alertsHistoryDataTableSettingsImport = () => import("./alerts-history-data-table.tsx")
 const heartbeatSettingsImport = () => import("./heartbeat.tsx")
+const tailscaleSettingsImport = () => import("./tailscale.tsx")
 
 const GeneralSettings = lazy(generalSettingsImport)
 const NotificationsSettings = lazy(notificationsSettingsImport)
@@ -33,6 +35,7 @@ const ConfigYamlSettings = lazy(configYamlSettingsImport)
 const FingerprintsSettings = lazy(fingerprintsSettingsImport)
 const AlertsHistoryDataTableSettings = lazy(alertsHistoryDataTableSettingsImport)
 const HeartbeatSettings = lazy(heartbeatSettingsImport)
+const TailscaleSettings = lazy(tailscaleSettingsImport)
 
 export async function saveSettings(newSettings: Partial<UserSettings>) {
 	try {
@@ -85,6 +88,13 @@ export default function SettingsLayout() {
 			icon: HeartPulseIcon,
 			admin: true,
 			preload: heartbeatSettingsImport,
+		},
+		{
+			title: "Tailscale",
+			href: getPagePath($router, "settings", { name: "tailscale" }),
+			icon: NetworkIcon,
+			admin: true,
+			preload: tailscaleSettingsImport,
 		},
 		{
 			title: t`YAML Config`,
@@ -148,5 +158,7 @@ function SettingsContent({ name }: { name: string }) {
 			return <AlertsHistoryDataTableSettings />
 		case "heartbeat":
 			return <HeartbeatSettings />
+		case "tailscale":
+			return <TailscaleSettings />
 	}
 }

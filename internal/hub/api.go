@@ -188,6 +188,7 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	// heartbeat status and test
 	apiAuth.GET("/heartbeat-status", h.getHeartbeatStatus).BindFunc(requireAdminRole)
 	apiAuth.POST("/test-heartbeat", h.testHeartbeat).BindFunc(requireAdminRole)
+	apiAuth.GET("/tailscale-status", h.getTailscaleStatus).BindFunc(requireAdminRole)
 	// get config.yml content
 	apiAuth.GET("/config-yaml", config.GetYamlConfig).BindFunc(requireAdminRole)
 	// handle agent websocket connection
@@ -384,6 +385,20 @@ func (h *Hub) testHeartbeat(e *core.RequestEvent) error {
 		return e.JSON(http.StatusOK, map[string]any{"err": err.Error()})
 	}
 	return e.JSON(http.StatusOK, map[string]any{"err": false})
+}
+
+// getTailscaleStatus returns the embedded Tailscale node's status
+func (h *Hub) getTailscaleStatus(e *core.RequestEvent) error {
+	if h.ts == nil {
+		return e.JSON(http.StatusOK, map[string]any{"enabled": false})
+	}
+	ctx, cancel := context.WithTimeout(e.Request.Context(), 5*time.Second)
+	defer cancel()
+	status, err := h.ts.status(ctx)
+	if err != nil {
+		return e.InternalServerError("Failed to get Tailscale status", err)
+	}
+	return e.JSON(http.StatusOK, status)
 }
 
 // containerRequestHandler handles both container logs and info requests

@@ -30,6 +30,13 @@ const sshKeepAliveInterval = 30 * time.Second
 // block the caller forever (GHSA-h9jh-29rh-w464).
 var sshHandshakeTimeout = 10 * time.Second
 
+// AgentDialer, when set, dials agent hosts it handles instead of the default
+// TCP dialer. The hub sets it to reach agents through its embedded Tailscale node.
+var AgentDialer interface {
+	Handles(host string) bool
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+}
+
 // SSHTransport implements Transport over SSH connections. It owns the single
 // SSH connection to an agent, which is shared by all requests and sessions.
 type SSHTransport struct {
@@ -199,8 +206,16 @@ func (t *SSHTransport) Connect(ctx context.Context) (*ssh.Client, error) {
 		host = net.JoinHostPort(host, t.port)
 	}
 
-	dialer := net.Dialer{Timeout: t.config.Timeout, KeepAlive: sshKeepAliveInterval}
-	conn, err := dialer.DialContext(ctx, network, host)
+	var conn net.Conn
+	var err error
+	if network == "tcp" && AgentDialer != nil && AgentDialer.Handles(t.host) {
+		dialCtx, cancel := context.WithTimeout(ctx, t.config.Timeout)
+		conn, err = AgentDialer.DialContext(dialCtx, network, host)
+		cancel()
+	} else {
+		dialer := net.Dialer{Timeout: t.config.Timeout, KeepAlive: sshKeepAliveInterval}
+		conn, err = dialer.DialContext(ctx, network, host)
+	}
 	if err != nil {
 		return nil, err
 	}

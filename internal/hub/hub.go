@@ -15,6 +15,7 @@ import (
 	"github.com/henrygd/beszel/internal/hub/config"
 	"github.com/henrygd/beszel/internal/hub/heartbeat"
 	"github.com/henrygd/beszel/internal/hub/systems"
+	"github.com/henrygd/beszel/internal/hub/transport"
 	"github.com/henrygd/beszel/internal/hub/utils"
 	"github.com/henrygd/beszel/internal/records"
 	"github.com/henrygd/beszel/internal/users"
@@ -36,6 +37,7 @@ type Hub struct {
 	pubKey string
 	signer ssh.Signer
 	appURL string
+	ts     *tailscale
 }
 
 // NewHub creates a new Hub instance with default configuration
@@ -45,6 +47,7 @@ func NewHub(app core.App) *Hub {
 	hub.um = users.NewUserManager(hub)
 	hub.rm = records.NewRecordManager(hub)
 	hub.sm = systems.NewSystemManager(hub)
+	hub.ts = newTailscale(app)
 	hub.hb = heartbeat.New(app, utils.GetEnv)
 	if hub.hb != nil {
 		hub.hbStop = make(chan struct{})
@@ -93,6 +96,10 @@ func (h *Hub) StartHub() error {
 		if err := h.startServer(e); err != nil {
 			return err
 		}
+		// route SSH connections to tailnet agents through the embedded node
+		if h.ts != nil {
+			transport.AgentDialer = h.ts
+		}
 		// start system updates
 		if err := h.sm.Initialize(); err != nil {
 			return err
@@ -101,7 +108,18 @@ func (h *Hub) StartHub() error {
 		if h.hb != nil {
 			go h.hb.Start(h.hbStop)
 		}
-		return e.Next()
+		if err := e.Next(); err != nil {
+			return err
+		}
+		// serve on the tailnet once the router is built
+		if h.ts != nil {
+			h.ts.serve(e.Server.Handler, e.Server)
+			h.App.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+				h.ts.close()
+				return e.Next()
+			})
+		}
+		return nil
 	})
 
 	// TODO: move to users package

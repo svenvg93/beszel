@@ -51,6 +51,13 @@ func (h *Hub) startServer(se *core.ServeEvent) error {
 		Host:   "localhost:5173",
 	})
 
+	// send Vite its own host so it doesn't block other hostnames (e.g. *.ts.net)
+	director := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		director(r)
+		r.Host = ""
+	}
+
 	proxy.Transport = &responseModifier{
 		transport: http.DefaultTransport,
 		hub:       h,
