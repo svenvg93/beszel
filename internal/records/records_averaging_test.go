@@ -329,6 +329,32 @@ func TestAverageSystemStatsSlice_TcpConnections(t *testing.T) {
 	assert.Equal(t, [4]uint32{}, records.AverageSystemStatsSlice([]system.Stats{{}, {}}).TcpConnections)
 }
 
+func TestAverageSystemStatsSlice_TcpInterfaces(t *testing.T) {
+	input := []system.Stats{
+		{
+			TcpConnections: [4]uint32{10, 4, 20, 2},
+			TcpInterfaces:  map[string][4]uint32{"eth0": {8, 4, 14, 2}, "wlan0": {2, 0, 3, 0}},
+		},
+		{
+			// wlan0 had no connections in this record
+			TcpConnections: [4]uint32{15, 7, 31, 5},
+			TcpInterfaces:  map[string][4]uint32{"eth0": {15, 7, 25, 5}},
+		},
+		{
+			// No tcp data (older agent) - should not affect averaging
+			Cpu: 30.0,
+		},
+	}
+
+	result := records.AverageSystemStatsSlice(input)
+
+	assert.Equal(t, map[string][4]uint32{
+		"eth0":  {12, 6, 20, 4},
+		"wlan0": {1, 0, 2, 0},
+	}, result.TcpInterfaces)
+	assert.Nil(t, records.AverageSystemStatsSlice([]system.Stats{{}, {}}).TcpInterfaces)
+}
+
 func TestAverageSystemStatsSlice_NetworkInterfaces(t *testing.T) {
 	input := []system.Stats{
 		{

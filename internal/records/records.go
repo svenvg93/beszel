@@ -285,6 +285,7 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 	zfsCapacityCounts := make(map[string]uint64)
 	// uint32 could overflow when summing many records
 	var tcpSums [4]uint64
+	var tcpIfaceSums map[string][4]uint64
 	tcpCount := uint64(0)
 
 	// Accumulate totals
@@ -335,6 +336,16 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 				tcpSums[i] += uint64(v)
 			}
 			tcpCount++
+		}
+		for name, v := range stats.TcpInterfaces {
+			if tcpIfaceSums == nil {
+				tcpIfaceSums = make(map[string][4]uint64, len(stats.TcpInterfaces))
+			}
+			acc := tcpIfaceSums[name]
+			for i := range v {
+				acc[i] += uint64(v[i])
+			}
+			tcpIfaceSums[name] = acc
 		}
 		if hasBattery(stats.Battery, stats.Batteries) {
 			batterySum += int(stats.Battery[0])
@@ -532,6 +543,17 @@ func AverageSystemStatsSlice(records []system.Stats) system.Stats {
 	if tcpCount > 0 {
 		for i := range tcpSums {
 			sum.TcpConnections[i] = uint32(math.Round(float64(tcpSums[i]) / float64(tcpCount)))
+		}
+		// an interface missing from a record had no connections, so divide by all tcp records
+		if len(tcpIfaceSums) > 0 {
+			sum.TcpInterfaces = make(map[string][4]uint32, len(tcpIfaceSums))
+			for name, sums := range tcpIfaceSums {
+				var avg [4]uint32
+				for i := range sums {
+					avg[i] = uint32(math.Round(float64(sums[i]) / float64(tcpCount)))
+				}
+				sum.TcpInterfaces[name] = avg
+			}
 		}
 	}
 	if batteryCount > 0 {

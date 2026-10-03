@@ -37,6 +37,7 @@ type Agent struct {
 	netIoStats                map[uint16]system.NetIoStats                          // Keeps track of bandwidth usage per cache interval
 	netInterfaceDeltaTrackers map[uint16]*deltatracker.DeltaTracker[string, uint64] // Per-cache-time NIC delta trackers
 	tcpConnections            [4]uint32                                             // Last TCP connection counts [established, time_wait, total, close_wait]
+	tcpInterfaces             map[string][4]uint32                                  // Last TCP connection counts per network interface
 	dockerManager             *dockerManager                                        // Manages Docker API requests
 	sensorConfig              *SensorConfig                                         // Sensors config
 	systemInfo                system.Info                                           // Host system info (dynamic)

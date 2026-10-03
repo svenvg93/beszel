@@ -3,6 +3,7 @@
 package agent
 
 import (
+	"net/netip"
 	"testing"
 	"time"
 
@@ -527,10 +528,39 @@ func TestCountTcpConnections(t *testing.T) {
 // TestUpdateTcpConnectionsRealtimeReusesSnapshot verifies that non-default
 // intervals don't list connections and reuse the last default-interval counts.
 func TestUpdateTcpConnectionsRealtimeReusesSnapshot(t *testing.T) {
-	a := &Agent{tcpConnections: [4]uint32{7, 3, 12, 2}}
+	a := &Agent{
+		tcpConnections: [4]uint32{7, 3, 12, 2},
+		tcpInterfaces:  map[string][4]uint32{"eth0": {5, 1, 8, 2}},
+	}
 	var stats system.Stats
 	a.updateTcpConnections(1000, &stats)
 	assert.Equal(t, [4]uint32{7, 3, 12, 2}, stats.TcpConnections)
+	assert.Equal(t, map[string][4]uint32{"eth0": {5, 1, 8, 2}}, stats.TcpInterfaces)
+}
+
+func TestCountTcpConnectionsByInterface(t *testing.T) {
+	addrs := map[netip.Addr]string{
+		netip.MustParseAddr("192.168.1.10"): "eth0",
+		netip.MustParseAddr("2001:db8::10"): "eth0",
+		netip.MustParseAddr("10.0.0.5"):     "wlan0",
+	}
+	conns := []psutilNet.ConnectionStat{
+		{Status: "ESTABLISHED", Laddr: psutilNet.Addr{IP: "192.168.1.10"}},
+		{Status: "TIME_WAIT", Laddr: psutilNet.Addr{IP: "2001:db8::10"}},
+		// IPv4-mapped address on a dual-stack socket
+		{Status: "ESTABLISHED", Laddr: psutilNet.Addr{IP: "::ffff:192.168.1.10"}},
+		{Status: "CLOSE_WAIT", Laddr: psutilNet.Addr{IP: "10.0.0.5"}},
+		// wildcard listener, loopback and unparsable addresses are not attributed
+		{Status: "LISTEN", Laddr: psutilNet.Addr{IP: "0.0.0.0"}},
+		{Status: "ESTABLISHED", Laddr: psutilNet.Addr{IP: "127.0.0.1"}},
+		{Status: "ESTABLISHED", Laddr: psutilNet.Addr{IP: ""}},
+	}
+	assert.Equal(t, map[string][4]uint32{
+		"eth0":  {2, 1, 3, 0},
+		"wlan0": {0, 0, 1, 1},
+	}, countTcpConnectionsByInterface(conns, addrs))
+	assert.Nil(t, countTcpConnectionsByInterface(conns, nil))
+	assert.Nil(t, countTcpConnectionsByInterface(conns[4:], addrs))
 }
 
 func TestSumAndTrackPerNicDeltasKeepsCountersWhenMacReadFails(t *testing.T) {

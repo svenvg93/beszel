@@ -174,6 +174,8 @@ export interface SystemStats {
 	wf?: Record<string, number>
 	/** tcp connection counts [established, time_wait, total, close_wait] */
 	tcp?: [number, number, number, number?]
+	/** tcp connection counts by network interface [established, time_wait, total, close_wait] */
+	tcpi?: Record<string, [number, number, number, number]>
 	/** network interfaces [upload bytes, download bytes, total upload bytes, total download bytes] */
 	ni?: Record<string, [number, number, number, number]>
 }
