@@ -161,6 +161,27 @@ export default function SettingsProfilePage({ userSettings }: { userSettings: Us
 								</SelectContent>
 							</Select>
 						</div>
+						<div className="grid gap-2">
+							<Label className="block" htmlFor="chartSync">
+								<Trans>Sync hover across charts</Trans>
+							</Label>
+							<Select name="chartSync" key={userSettings.chartSync} defaultValue={userSettings.chartSync ?? "off"}>
+								<SelectTrigger id="chartSync">
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="off">
+										<Trans>Off</Trans>
+									</SelectItem>
+									<SelectItem value="crosshair">
+										<Trans>Crosshair only</Trans>
+									</SelectItem>
+									<SelectItem value="tooltip">
+										<Trans>Crosshair and tooltip</Trans>
+									</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
 					</div>
 				</div>
 				<Separator />
