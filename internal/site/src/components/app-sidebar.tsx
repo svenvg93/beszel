@@ -3,6 +3,7 @@ import { useStore } from "@nanostores/react"
 import { getPagePath } from "@nanostores/router"
 import {
 	AlertOctagonIcon,
+	ArrowUpRightIcon,
 	BellIcon,
 	ChevronsUpDownIcon,
 	CircleArrowUpIcon,
@@ -47,9 +48,10 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar"
 import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
-import { $newVersion } from "@/lib/stores"
+import { $direction, $newVersion } from "@/lib/stores"
 import { runOnce } from "@/lib/utils"
 import { Logo } from "./logo"
+import { useThemeCycle } from "./mode-toggle"
 import { $router, basePath, Link, prependBasePath } from "./router"
 
 export interface NavItem {
@@ -128,6 +130,19 @@ export function getNavGroups(): NavGroup[] {
 			],
 		},
 		{
+			label: <Trans>Alerts</Trans>,
+			items: [
+				{
+					title: <Trans>Alert History</Trans>,
+					tooltip: "Alert History",
+					href: getPagePath($router, "alerts"),
+					icon: AlertOctagonIcon,
+					isActive: (page) => page?.route === "alerts",
+					preload: runOnce(() => import("@/components/routes/alerts")),
+				},
+			],
+		},
+		{
 			label: <Trans>Settings</Trans>,
 			items: [
 				settingsItem(
@@ -141,7 +156,6 @@ export function getNavGroups(): NavGroup[] {
 				...(isReadOnlyUser()
 					? []
 					: [settingsItem("tokens", <Trans>Tokens & Fingerprints</Trans>, "Tokens & Fingerprints", FingerprintIcon)]),
-				settingsItem("alert-history", <Trans>Alert History</Trans>, "Alert History", AlertOctagonIcon),
 				...(isAdmin()
 					? [
 							settingsItem("heartbeat", <Trans>Heartbeat</Trans>, "Heartbeat", HeartPulseIcon),
@@ -177,6 +191,7 @@ export function getNavGroups(): NavGroup[] {
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 	const page = useStore($router)
+	const direction = useStore($direction)
 	const { isMobile, setOpenMobile } = useSidebar()
 
 	const groups = getNavGroups()
@@ -185,7 +200,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 	const onNavigate = () => isMobile && setOpenMobile(false)
 
 	return (
-		<Sidebar collapsible="icon" {...props}>
+		// the sidebar is positioned with physical sides, so flip it for right-to-left languages
+		<Sidebar collapsible="icon" side={direction === "rtl" ? "right" : "left"} {...props}>
 			<SidebarHeader>
 				<SidebarMenu>
 					<SidebarMenuItem>
@@ -214,6 +230,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 											<a href={item.href} target="_blank" rel="noopener">
 												<item.icon />
 												<span>{item.title}</span>
+												<ArrowUpRightIcon
+													aria-hidden
+													className="ms-auto opacity-50 rtl:-scale-x-100 group-data-[collapsible=icon]:hidden"
+												/>
 											</a>
 										) : (
 											<Link href={item.href} onMouseEnter={item.preload} onClick={onNavigate}>
@@ -277,6 +297,7 @@ function NavRepoLinks() {
 
 function NavUser() {
 	const { isMobile } = useSidebar()
+	const { Icon: ThemeIcon, cycleTheme } = useThemeCycle()
 	const email = pb.authStore.record?.email
 
 	return (
@@ -303,6 +324,19 @@ function NavUser() {
 						sideOffset={4}
 					>
 						<DropdownMenuLabel className="truncate font-normal">{email}</DropdownMenuLabel>
+						<DropdownMenuSeparator />
+						<DropdownMenuGroup>
+							<DropdownMenuItem
+								onSelect={(e) => {
+									// keep the menu open so the new theme is visible
+									e.preventDefault()
+									cycleTheme()
+								}}
+							>
+								<ThemeIcon className="me-2.5 size-4" />
+								<Trans>Switch theme</Trans>
+							</DropdownMenuItem>
+						</DropdownMenuGroup>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
 							<DropdownMenuItem onSelect={logOut}>

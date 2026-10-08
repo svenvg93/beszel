@@ -35,6 +35,8 @@
 	--chart-saturation: 65%;
 	--chart-lightness: 50%;
 	--container: 1500px;
+	--sidebar: hsl(30 6% 95%);
+	--sidebar-accent: hsl(30 6% 90%);
 }
 
 .dark {
@@ -61,6 +63,8 @@
 	--radius: 0.8rem;
 	--chart-saturation: 60%;
 	--chart-lightness: 55%;
+	--sidebar: hsl(220 5.5% 7%);
+	--sidebar-accent: hsl(220 5% 13%);
 }
 
 @theme inline {
@@ -116,11 +120,11 @@
 	--color-chart-5: var(--chart-5);
 	--color-table-header: var(--table-header);
 
-	--color-sidebar: var(--card);
+	--color-sidebar: var(--sidebar);
 	--color-sidebar-foreground: var(--card-foreground);
 	--color-sidebar-primary: var(--primary);
 	--color-sidebar-primary-foreground: var(--primary-foreground);
-	--color-sidebar-accent: var(--accent);
+	--color-sidebar-accent: var(--sidebar-accent);
 	--color-sidebar-accent-foreground: var(--accent-foreground);
 	--color-sidebar-border: var(--border);
 	--color-sidebar-ring: var(--ring);

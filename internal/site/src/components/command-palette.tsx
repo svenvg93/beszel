@@ -139,6 +139,20 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 						</CommandItem>
 						<CommandItem
 							onSelect={() => {
+								navigate(getPagePath($router, "alerts"))
+								setOpen(false)
+							}}
+						>
+							<AlertOctagonIcon className="me-2 size-4" />
+							<span>
+								<Trans>Alert History</Trans>
+							</span>
+							<CommandShortcut>
+								<Trans>Page</Trans>
+							</CommandShortcut>
+						</CommandItem>
+						<CommandItem
+							onSelect={() => {
 								navigate(getPagePath($router, "settings", { name: "general" }))
 								setOpen(false)
 							}}
@@ -172,18 +186,6 @@ export default memo(function CommandPalette({ open, setOpen }: { open: boolean; 
 							<FingerprintIcon className="me-2 size-4" />
 							<span>
 								<Trans>Tokens & Fingerprints</Trans>
-							</span>
-							{SettingsShortcut}
-						</CommandItem>
-						<CommandItem
-							onSelect={() => {
-								navigate(getPagePath($router, "settings", { name: "alert-history" }))
-								setOpen(false)
-							}}
-						>
-							<AlertOctagonIcon className="me-2 size-4" />
-							<span>
-								<Trans>Alert History</Trans>
 							</span>
 							{SettingsShortcut}
 						</CommandItem>

@@ -2,14 +2,7 @@ import { t } from "@lingui/core/macro"
 import { useLingui } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
 import { getPagePath, redirectPage } from "@nanostores/router"
-import {
-	AlertOctagonIcon,
-	BellIcon,
-	FileSlidersIcon,
-	FingerprintIcon,
-	HeartPulseIcon,
-	SettingsIcon,
-} from "lucide-react"
+import { BellIcon, FileSlidersIcon, FingerprintIcon, HeartPulseIcon, SettingsIcon } from "lucide-react"
 import { lazy, useEffect } from "react"
 import { $router } from "@/components/router.tsx"
 import { Card, CardContent } from "@/components/ui/card.tsx"
@@ -23,14 +16,12 @@ const generalSettingsImport = () => import("./general.tsx")
 const notificationsSettingsImport = () => import("./notifications.tsx")
 const configYamlSettingsImport = () => import("./config-yaml.tsx")
 const fingerprintsSettingsImport = () => import("./tokens-fingerprints.tsx")
-const alertsHistoryDataTableSettingsImport = () => import("./alerts-history-data-table.tsx")
 const heartbeatSettingsImport = () => import("./heartbeat.tsx")
 
 const GeneralSettings = lazy(generalSettingsImport)
 const NotificationsSettings = lazy(notificationsSettingsImport)
 const ConfigYamlSettings = lazy(configYamlSettingsImport)
 const FingerprintsSettings = lazy(fingerprintsSettingsImport)
-const AlertsHistoryDataTableSettings = lazy(alertsHistoryDataTableSettingsImport)
 const HeartbeatSettings = lazy(heartbeatSettingsImport)
 
 export async function saveSettings(newSettings: Partial<UserSettings>) {
@@ -73,12 +64,6 @@ export default function SettingsLayout() {
 			preload: fingerprintsSettingsImport,
 		},
 		{
-			title: t`Alert History`,
-			href: getPagePath($router, "settings", { name: "alert-history" }),
-			icon: AlertOctagonIcon,
-			preload: alertsHistoryDataTableSettingsImport,
-		},
-		{
 			title: t`Heartbeat`,
 			href: getPagePath($router, "settings", { name: "heartbeat" }),
 			icon: HeartPulseIcon,
@@ -100,8 +85,12 @@ export default function SettingsLayout() {
 	useEffect(() => {
 		document.title = `${t`Settings`} / Beszel`
 		// @ts-expect-error redirect to account page if no page is specified
-		if (!page?.params?.name) {
+		const name = page?.params?.name
+		if (!name) {
 			redirectPage($router, "settings", { name: "general" })
+		} else if (name === "alert-history") {
+			// alert history moved to its own page
+			redirectPage($router, "alerts")
 		}
 	}, [])
 
@@ -134,8 +123,6 @@ function SettingsContent({ name }: { name: string }) {
 			return <ConfigYamlSettings />
 		case "tokens":
 			return <FingerprintsSettings />
-		case "alert-history":
-			return <AlertsHistoryDataTableSettings />
 		case "heartbeat":
 			return <HeartbeatSettings />
 	}

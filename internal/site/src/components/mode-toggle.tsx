@@ -9,21 +9,24 @@ import { cn } from "@/lib/utils"
 const themes = ["light", "dark", "system"] as const
 const icons = [SunIcon, MoonStarIcon, SunMoonIcon] as const
 
-export function ModeToggle() {
+/** Current theme icon and a function that cycles light -> dark -> system */
+export function useThemeCycle() {
 	const { theme, setTheme } = useTheme()
-
 	const currentIndex = themes.indexOf(theme)
-	const Icon = icons[currentIndex]
+	return {
+		currentIndex,
+		Icon: icons[currentIndex],
+		cycleTheme: () => setTheme(themes[(currentIndex + 1) % themes.length]),
+	}
+}
+
+export function ModeToggle() {
+	const { currentIndex, Icon, cycleTheme } = useThemeCycle()
 
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
-				<Button
-					variant={"ghost"}
-					size="icon"
-					aria-label={t`Switch theme`}
-					onClick={() => setTheme(themes[(currentIndex + 1) % themes.length])}
-				>
+				<Button variant={"ghost"} size="icon" aria-label={t`Switch theme`} onClick={cycleTheme}>
 					<Icon
 						className={cn(
 							"animate-in fade-in spin-in-[-30deg] duration-200",

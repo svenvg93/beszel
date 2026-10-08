@@ -33,6 +33,7 @@ const Home = lazy(() => import("@/components/routes/home.tsx"))
 const Containers = lazy(() => import("@/components/routes/containers.tsx"))
 const Smart = lazy(() => import("@/components/routes/smart.tsx"))
 const Monitors = lazy(() => import("@/components/routes/monitors.tsx"))
+const Alerts = lazy(() => import("@/components/routes/alerts.tsx"))
 const SystemDetail = lazy(() => import("@/components/routes/system.tsx"))
 const CopyToClipboardDialog = lazy(() => import("@/components/copy-to-clipboard.tsx"))
 const ActiveAlerts = lazy(() => import("@/components/active-alerts.tsx").then((m) => ({ default: m.ActiveAlerts })))
@@ -85,6 +86,8 @@ const App = memo(() => {
 		return <Smart />
 	} else if (page.route === "monitors") {
 		return <Monitors />
+	} else if (page.route === "alerts") {
+		return <Alerts />
 	} else if (page.route === "settings") {
 		return <Settings />
 	}
@@ -108,7 +111,7 @@ const Layout = () => {
 				</Suspense>
 			) : (
 				<SidebarProvider defaultOpen={!document.cookie.includes("sidebar_state=false")}>
-					<AppSidebar />
+					<AppSidebar variant="inset" />
 					<SidebarInset
 						className="min-w-0"
 						style={{ "--container": `${layoutWidth ?? defaultLayoutWidth}px` } as React.CSSProperties}

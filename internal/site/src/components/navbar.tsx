@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils"
 import { $allSystemsById } from "@/lib/stores"
 import { AddSystemDialog } from "./add-system"
 import { getNavGroups } from "./app-sidebar"
-import { ModeToggle } from "./mode-toggle"
 import { $router, Link } from "./router"
 
 const CommandPalette = lazy(() => import("./command-palette"))
@@ -65,7 +64,6 @@ export default function Navbar() {
 				>
 					<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
 				</Button>
-				<ModeToggle />
 				{!isReadOnlyUser() && (
 					<Button variant="outline" className="flex gap-1 ms-2 bg-card" onClick={() => setAddSystemDialogOpen(true)}>
 						<PlusIcon className="h-4 w-4 -ms-1" />
@@ -107,7 +105,7 @@ function Breadcrumbs() {
 					const last = i === crumbs.length - 1
 					return (
 						<Fragment key={i}>
-							{i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
+							{i > 0 && <BreadcrumbSeparator className="hidden md:block rtl:[&>svg]:rotate-180" />}
 							<BreadcrumbItem className={cn(!last && "hidden md:inline-flex", last && "min-w-0")}>
 								{last ? (
 									<BreadcrumbPage className="truncate">{crumb.title}</BreadcrumbPage>

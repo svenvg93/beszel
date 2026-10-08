@@ -43,14 +43,14 @@ import { alertInfo } from "@/lib/alerts"
 import { pb } from "@/lib/api"
 import { cn, formatDuration, formatShortDate, useBrowserStorage } from "@/lib/utils"
 import type { AlertsHistoryRecord } from "@/types"
-import { alertsHistoryColumns } from "../../alerts-history-columns"
+import { alertsHistoryColumns } from "./alerts-history-columns"
 
 const SectionIntro = memo(() => {
 	return (
-		<div>
-			<h3 className="text-xl font-medium mb-2">
+		<div className="px-2 sm:px-1">
+			<h1 className="sr-only">
 				<Trans>Alert History</Trans>
-			</h3>
+			</h1>
 			<p className="text-sm text-muted-foreground leading-relaxed">
 				<Trans>View your 200 most recent alerts.</Trans>
 			</p>
@@ -67,7 +67,7 @@ export default function AlertsHistoryDataTable() {
 	const [globalFilter, setGlobalFilter] = useState("")
 	const { toast } = useToast()
 	const [deleteOpen, setDeleteDialogOpen] = useState(false)
-	
+
 	// Store pagination preference in local storage
 	const [pagination, setPagination] = useBrowserStorage<PaginationState>("ah-pagination", {
 		pageIndex: 0,
@@ -226,7 +226,7 @@ export default function AlertsHistoryDataTable() {
 
 	return (
 		<div className="@container w-full">
-			<div className="@3xl:flex items-end mb-4 gap-4">
+			<div className="@3xl:flex items-center mb-3 sm:mb-4 gap-4">
 				<SectionIntro />
 				<div className="flex items-center gap-2 ms-auto mt-3 @3xl:mt-0">
 					{table.getFilteredSelectedRowModel().rows.length > 0 && (
@@ -262,7 +262,7 @@ export default function AlertsHistoryDataTable() {
 									</AlertDialogFooter>
 								</AlertDialogContent>
 							</AlertDialog>
-							<Button variant="outline" className="h-10" onClick={handleExportCSV}>
+							<Button variant="outline" className="h-10 bg-card" onClick={handleExportCSV}>
 								<DownloadIcon className="size-4" />
 								<span className="ms-1">
 									<Trans>Export</Trans>
@@ -274,11 +274,11 @@ export default function AlertsHistoryDataTable() {
 						placeholder={t`Filter...`}
 						value={globalFilter}
 						onChange={(e) => setGlobalFilter(e.target.value)}
-						className="px-4 w-full max-w-full @3xl:w-64"
+						className="px-4 w-full max-w-full @3xl:w-64 bg-card"
 					/>
 				</div>
 			</div>
-			<div className="rounded-md border overflow-x-auto whitespace-nowrap">
+			<div className="rounded-md border bg-card overflow-x-auto whitespace-nowrap">
 				<Table>
 					<TableHeader>
 						{table.getHeaderGroups().map((headerGroup) => (
@@ -327,7 +327,7 @@ export default function AlertsHistoryDataTable() {
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
-								table.setPageSize(Number(value));
+								table.setPageSize(Number(value))
 							}}
 						>
 							<SelectTrigger className="w-18" id="rows-per-page">
