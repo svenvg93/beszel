@@ -551,11 +551,16 @@ export default function DisksTable({ systemId }: { systemId?: string }) {
 
 	return (
 		<div>
-			<Card className="@container w-full px-3 py-5 sm:py-6 sm:px-6">
+			<Card
+				className={cn(
+					"@container w-full",
+					systemId ? "px-3 py-5 sm:py-6 sm:px-6" : "border-0 bg-transparent shadow-none"
+				)}
+			>
 				<CardHeader className="p-0 mb-3 sm:mb-4">
-					<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
+					<div className={cn("grid md:flex gap-x-5 gap-y-3 w-full", systemId ? "items-end" : "items-center")}>
 						<div className="px-2 sm:px-1">
-							<CardTitle className="mb-2">S.M.A.R.T.</CardTitle>
+							<CardTitle className={cn("mb-2", !systemId && "sr-only")}>S.M.A.R.T.</CardTitle>
 							<CardDescription className="flex">
 								<Trans>Click on a device to view more information.</Trans>
 							</CardDescription>
@@ -565,7 +570,7 @@ export default function DisksTable({ systemId }: { systemId?: string }) {
 								placeholder={t`Filter...`}
 								value={globalFilter}
 								onChange={(event) => setGlobalFilter(event.target.value)}
-								className="px-4 w-full max-w-full md:w-64"
+								className={cn("px-4 w-full max-w-full md:w-64", !systemId && "bg-card")}
 							/>
 							{globalFilter && (
 								<Button
@@ -624,7 +629,7 @@ const SmartDevicesTable = memo(function SmartDevicesTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto rounded-md border",
+				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto rounded-md border bg-card",
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}
 			ref={scrollRef}

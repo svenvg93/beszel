@@ -577,7 +577,12 @@ export function AddMonitorDialog({ systemId, monitors }: { systemId?: string; mo
 	return (
 		<>
 			<div className="flex gap-0 rounded-lg">
-				<Button variant="outline" onClick={openAdd} className="rounded-e-none grow" disabled={!hasEligibleSystems}>
+				<Button
+					variant="outline"
+					onClick={openAdd}
+					className={cn("rounded-e-none grow", !systemId && "bg-card")}
+					disabled={!hasEligibleSystems}
+				>
 					<PlusIcon className="size-4 me-1" />
 					<span className="sm:hidden">
 						<Trans>Add</Trans>
@@ -591,7 +596,7 @@ export function AddMonitorDialog({ systemId, monitors }: { systemId?: string; mo
 					<DropdownMenuTrigger asChild>
 						<Button
 							variant="outline"
-							className="px-2 rounded-s-none border-s-0"
+							className={cn("px-2 rounded-s-none border-s-0", !systemId && "bg-card")}
 							aria-label={`More actions`}
 							disabled={!hasEligibleSystems}
 						>
@@ -902,11 +907,7 @@ function MonitorDialogContent({
 						<Label>
 							<Trans>DNS Server</Trans>
 						</Label>
-						<Input
-							value={server}
-							onChange={(e) => setServer(e.target.value)}
-							placeholder="1.1.1.1"
-						/>
+						<Input value={server} onChange={(e) => setServer(e.target.value)} placeholder="1.1.1.1" />
 						<p className="text-xs text-muted-foreground">
 							<Trans>Optional. Defaults to the agent's system resolver.</Trans>
 						</p>
@@ -960,11 +961,7 @@ function MonitorDialogContent({
 							loading || dnsTargetIsIp || (!systemId && (isEditing ? !selectedSystemId : !selectedSystemIds.size))
 						}
 					>
-						{isEditing ? (
-							<Trans>Save {{ foo: t`Monitor` }}</Trans>
-						) : (
-							<Trans>Add {{ foo: t`Monitor` }}</Trans>
-						)}
+						{isEditing ? <Trans>Save {{ foo: t`Monitor` }}</Trans> : <Trans>Add {{ foo: t`Monitor` }}</Trans>}
 					</Button>
 				</DialogFooter>
 			</form>

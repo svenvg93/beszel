@@ -209,9 +209,9 @@ export default function SystemsTable() {
 	const CardHead = useMemo(() => {
 		return (
 			<CardHeader className="p-0 mb-3 sm:mb-4">
-				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
+				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-center">
 					<div className="px-2 sm:px-1">
-						<CardTitle className="mb-2">
+						<CardTitle className="sr-only">
 							<Trans>All Systems</Trans>
 						</CardTitle>
 						<CardDescription className="flex">
@@ -225,7 +225,7 @@ export default function SystemsTable() {
 								placeholder={t`Filter...`}
 								onChange={(e) => setFilter(e.target.value)}
 								value={filter}
-								className="ps-4 pe-10 w-full"
+								className="ps-4 pe-10 w-full bg-card"
 							/>
 							{filter && (
 								<Button
@@ -242,7 +242,7 @@ export default function SystemsTable() {
 						</div>
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="outline">
+								<Button variant="outline" className="bg-card">
 									<Settings2Icon className="me-1.5 size-4 opacity-80" />
 									<Trans>View</Trans>
 								</Button>
@@ -374,7 +374,7 @@ export default function SystemsTable() {
 	])
 
 	return (
-		<Card className="w-full px-3 py-5 sm:py-6 sm:px-6">
+		<div className="w-full">
 			{CardHead}
 			{viewMode === "table" ? (
 				// table layout
@@ -395,7 +395,7 @@ export default function SystemsTable() {
 					)}
 				</div>
 			)}
-		</Card>
+		</div>
 	)
 }
 
@@ -418,7 +418,7 @@ const AllSystemsTable = memo(
 		return (
 			<div
 				className={cn(
-					"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+					"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md bg-card",
 					// don't set min height if there are less than 2 rows, do set if we need to display the empty state
 					(!rows.length || rows.length > 2) && "min-h-50"
 				)}
@@ -549,7 +549,10 @@ const SystemCard = memo(
 						</div>
 					</CardHeader>
 					<CardContent className="text-sm px-5 pt-3.5 pb-4">
-						<div className="grid gap-2.5" style={{ gridTemplateColumns: "24px minmax(80px, max-content) minmax(0, 1fr)" }}>
+						<div
+							className="grid gap-2.5"
+							style={{ gridTemplateColumns: "24px minmax(80px, max-content) minmax(0, 1fr)" }}
+						>
 							{table.getAllColumns().map((column) => {
 								if (!column.getIsVisible() || column.id === "system" || column.id === "actions") return null
 								const cell = row.getAllCells().find((cell) => cell.column.id === column.id)

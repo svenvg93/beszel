@@ -44,7 +44,7 @@ export default function Navbar() {
 			<div className="ms-auto flex items-center">
 				<Button
 					variant="outline"
-					className="hidden lg:block text-sm text-muted-foreground px-4 me-1"
+					className="hidden lg:block bg-card text-sm text-muted-foreground px-4 me-1"
 					onClick={() => setCommandPaletteOpen(true)}
 				>
 					<span className="flex items-center">
@@ -67,7 +67,7 @@ export default function Navbar() {
 				</Button>
 				<ModeToggle />
 				{!isReadOnlyUser() && (
-					<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
+					<Button variant="outline" className="flex gap-1 ms-2 bg-card" onClick={() => setAddSystemDialogOpen(true)}>
 						<PlusIcon className="h-4 w-4 -ms-1" />
 						<span className="hidden sm:inline">
 							<Trans>Add System</Trans>

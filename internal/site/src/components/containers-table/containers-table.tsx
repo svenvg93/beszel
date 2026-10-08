@@ -165,11 +165,16 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 	const visibleColumns = table.getVisibleLeafColumns()
 
 	return (
-		<Card className="@container w-full px-3 py-5 sm:py-6 sm:px-6">
+		<Card
+			className={cn(
+				"@container w-full",
+				systemId ? "px-3 py-5 sm:py-6 sm:px-6" : "border-0 bg-transparent shadow-none"
+			)}
+		>
 			<CardHeader className="p-0 mb-3 sm:mb-4">
-				<div className="grid md:flex gap-x-5 gap-y-3 w-full items-end">
+				<div className={cn("grid md:flex gap-x-5 gap-y-3 w-full", systemId ? "items-end" : "items-center")}>
 					<div className="px-2 sm:px-1">
-						<CardTitle className="mb-2">
+						<CardTitle className={cn("mb-2", !systemId && "sr-only")}>
 							<Trans>All Containers</Trans>
 						</CardTitle>
 						<CardDescription className="flex">
@@ -181,7 +186,7 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 							placeholder={t`Filter...`}
 							value={globalFilter}
 							onChange={(e) => setGlobalFilter(e.target.value)}
-							className="ps-4 pe-10 w-full"
+							className={cn("ps-4 pe-10 w-full", !systemId && "bg-card")}
 						/>
 						{globalFilter && (
 							<Button
@@ -239,7 +244,7 @@ const AllContainersTable = memo(function AllContainersTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md bg-card",
 				// don't set min height if there are less than 2 rows, do set if we need to display the empty state
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}

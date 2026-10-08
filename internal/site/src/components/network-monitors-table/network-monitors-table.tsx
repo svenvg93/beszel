@@ -314,11 +314,16 @@ export default function NetworkMonitorsTableNew({
 	const visibleColumnsKey = visibleColumns.map((column) => column.id).join(",")
 
 	return (
-		<Card className="@container w-full px-3 py-5 sm:py-6 sm:px-6">
+		<Card
+			className={cn(
+				"@container w-full",
+				systemId ? "px-3 py-5 sm:py-6 sm:px-6" : "border-0 bg-transparent shadow-none"
+			)}
+		>
 			<CardHeader className="p-0 mb-3 sm:mb-4">
-				<div className="grid md-lg:flex gap-x-5 gap-y-3 w-full items-end">
+				<div className={cn("grid md-lg:flex gap-x-5 gap-y-3 w-full", systemId ? "items-end" : "items-center")}>
 					<div className="px-2 sm:px-1">
-						<CardTitle className="mb-2">
+						<CardTitle className={cn("mb-2", !systemId && "sr-only")}>
 							<Trans>Network Monitors</Trans>
 						</CardTitle>
 						<div className="text-sm text-muted-foreground flex items-center flex-wrap">
@@ -332,7 +337,7 @@ export default function NetworkMonitorsTableNew({
 									placeholder={t`Filter...`}
 									value={globalFilter}
 									onChange={(e) => setGlobalFilter(e.target.value)}
-									className="ms-auto px-4 w-full max-w-full md-lg:w-50"
+									className={cn("ms-auto px-4 w-full max-w-full md-lg:w-50", !systemId && "bg-card")}
 								/>
 								{globalFilter && (
 									<Button
@@ -350,7 +355,7 @@ export default function NetworkMonitorsTableNew({
 						)}
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="outline">
+								<Button variant="outline" className={cn(!systemId && "bg-card")}>
 									<Settings2Icon className="me-1.5 size-4 opacity-80" />
 									<Trans>View</Trans>
 								</Button>
@@ -521,7 +526,7 @@ const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 	return (
 		<div
 			className={cn(
-				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md",
+				"h-min max-h-[calc(100dvh-17rem)] max-w-full relative overflow-auto border rounded-md bg-card",
 				(!rows.length || rows.length > 2) && "min-h-50"
 			)}
 			ref={scrollRef}
@@ -673,13 +678,7 @@ function CertExpiry({ cert }: { cert: MonitorCertInfo }) {
 			<Separator orientation="vertical" className="h-2.5 bg-muted-foreground opacity-70" />
 			<ShieldCheckIcon className={cn("size-3.5 text-muted-foreground -me-1", certExpiryTextColors[level])} />
 			<span className={certExpiryTextColors[level]}>
-				{daysLeft < 0 ? (
-					<Trans>Certificate expired {expires}</Trans>
-				) : (
-					<Trans>
-						Certificate expires {expires} 
-					</Trans>
-				)}
+				{daysLeft < 0 ? <Trans>Certificate expired {expires}</Trans> : <Trans>Certificate expires {expires}</Trans>}
 			</span>
 			{cert.issuer && (
 				<>
