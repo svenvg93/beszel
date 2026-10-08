@@ -1,7 +1,6 @@
 import { useLingui } from "@lingui/react/macro"
 import { memo, Suspense, useEffect, useMemo } from "react"
 import SystemsTable from "@/components/systems-table/systems-table"
-import { FooterRepoLink } from "@/components/footer-repo-link"
 
 export default memo(() => {
 	const { t } = useLingui()
@@ -16,7 +15,6 @@ export default memo(() => {
 				<Suspense>
 					<SystemsTable />
 				</Suspense>
-				<FooterRepoLink />
 			</>
 		),
 		[]

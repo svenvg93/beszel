@@ -6,10 +6,12 @@ import { DirectionProvider } from "@radix-ui/react-direction"
 // import { Suspense, lazy, useEffect, StrictMode } from "react"
 import { lazy, memo, Suspense, useEffect } from "react"
 import ReactDOM from "react-dom/client"
+import { AppSidebar } from "@/components/app-sidebar.tsx"
 import Navbar from "@/components/navbar.tsx"
 import { $router } from "@/components/router.tsx"
 import Settings from "@/components/routes/settings/layout.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar.tsx"
 import { Toaster } from "@/components/ui/toaster.tsx"
 import { alertManager } from "@/lib/alerts"
 import { isAdmin, pb, updateUserSettings } from "@/lib/api.ts"
@@ -105,22 +107,28 @@ const Layout = () => {
 					<LoginPage />
 				</Suspense>
 			) : (
-				<div style={{ "--container": `${layoutWidth ?? defaultLayoutWidth}px` } as React.CSSProperties}>
-					<div className="container">
-						<Navbar />
-					</div>
-					<div className="container relative">
-						<Suspense>
-							<ActiveAlerts className="mb-4" />
-						</Suspense>
-						<App />
-						{copyContent && (
+				<SidebarProvider defaultOpen={!document.cookie.includes("sidebar_state=false")}>
+					<AppSidebar />
+					<SidebarInset
+						className="min-w-0"
+						style={{ "--container": `${layoutWidth ?? defaultLayoutWidth}px` } as React.CSSProperties}
+					>
+						<div className="container">
+							<Navbar />
+						</div>
+						<div className="container relative pb-6">
 							<Suspense>
-								<CopyToClipboardDialog content={copyContent} />
+								<ActiveAlerts className="mb-4" />
 							</Suspense>
-						)}
-					</div>
-				</div>
+							<App />
+							{copyContent && (
+								<Suspense>
+									<CopyToClipboardDialog content={copyContent} />
+								</Suspense>
+							)}
+						</div>
+					</SidebarInset>
+				</SidebarProvider>
 			)}
 		</DirectionProvider>
 	)

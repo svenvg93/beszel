@@ -1,7 +1,6 @@
 import { useLingui } from "@lingui/react/macro"
 import { memo, useEffect } from "react"
 import NetworkMonitorsTableNew from "@/components/network-monitors-table/network-monitors-table"
-import { FooterRepoLink } from "@/components/footer-repo-link"
 import { useNetworkMonitors } from "@/lib/use-network-monitors"
 import { $allSystemsById } from "@/lib/stores"
 import { supportsNetworkMonitors } from "@/lib/utils"
@@ -23,7 +22,6 @@ export default memo(() => {
 	return (
 		<>
 			<NetworkMonitorsTableNew monitors={visibleMonitors} isLoading={isLoading} />
-			<FooterRepoLink />
 		</>
 	)
 })

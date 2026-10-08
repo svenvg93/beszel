@@ -1,41 +1,25 @@
 import { Trans } from "@lingui/react/macro"
-import { getPagePath } from "@nanostores/router"
+import { useStore } from "@nanostores/react"
+import { PlusIcon, SearchIcon } from "lucide-react"
+import { Fragment, lazy, Suspense, useState } from "react"
 import {
-	ContainerIcon,
-	DatabaseBackupIcon,
-	HardDriveIcon,
-	LogOutIcon,
-	LogsIcon,
-	MenuIcon,
-	NetworkIcon,
-	PlusIcon,
-	SearchIcon,
-	ServerIcon,
-	SettingsIcon,
-	UserIcon,
-	UsersIcon,
-} from "lucide-react"
-import { lazy, Suspense, useState } from "react"
-import { Button, buttonVariants } from "@/components/ui/button"
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuSub,
-	DropdownMenuSubContent,
-	DropdownMenuSubTrigger,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
-import { cn, runOnce } from "@/lib/utils"
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { isReadOnlyUser } from "@/lib/api"
+import { cn } from "@/lib/utils"
+import { $allSystemsById } from "@/lib/stores"
 import { AddSystemDialog } from "./add-system"
-import { Logo } from "./logo"
+import { getNavGroups } from "./app-sidebar"
 import { ModeToggle } from "./mode-toggle"
-import { $router, basePath, Link, navigate, prependBasePath } from "./router"
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip"
+import { $router, Link } from "./router"
 
 const CommandPalette = lazy(() => import("./command-palette"))
 
@@ -45,206 +29,101 @@ export default function Navbar() {
 	const [addSystemDialogOpen, setAddSystemDialogOpen] = useState(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
-	const AdminLinks = AdminDropdownGroup()
-
 	return (
-		<div className="flex items-center h-14 md:h-16 bg-card px-4 pe-3 sm:px-6 border border-border/60 bt-0 rounded-md my-4">
+		<header className="flex h-14 md:h-16 shrink-0 items-center gap-2 my-2 min-w-0">
 			<Suspense>
 				<CommandPalette open={commandPaletteOpen} setOpen={setCommandPaletteOpen} />
 			</Suspense>
 			<AddSystemDialog open={addSystemDialogOpen} setOpen={setAddSystemDialogOpen} />
 
-			<Link
-				href={basePath}
-				aria-label="Home"
-				className="p-2 ps-0 me-3 group"
-				onMouseEnter={runOnce(() => import("@/components/routes/home"))}
-			>
-				<Logo className="h-[1.2rem] md:h-5 fill-foreground" />
-			</Link>
-			<Button
-				variant="outline"
-				className="hidden md:block text-sm text-muted-foreground px-4"
-				onClick={() => setCommandPaletteOpen(true)}
-			>
-				<span className="flex items-center">
-					<SearchIcon className="me-1.5 h-4 w-4" />
-					<Trans>Search</Trans>
-					<span className="flex items-center ms-3.5">
-						<Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
-						<Kbd>K</Kbd>
-					</span>
-				</span>
-			</Button>
+			<SidebarTrigger className="-ms-1" />
+			<Separator orientation="vertical" className="me-2 h-4" />
 
-			{/* mobile menu */}
-			<div className="ms-auto flex items-center text-xl md:hidden">
-				<ModeToggle />
-				<Button variant="ghost" size="icon" onClick={() => setCommandPaletteOpen(true)}>
+			<Breadcrumbs />
+
+			<div className="ms-auto flex items-center">
+				<Button
+					variant="outline"
+					className="hidden lg:block text-sm text-muted-foreground px-4 me-1"
+					onClick={() => setCommandPaletteOpen(true)}
+				>
+					<span className="flex items-center">
+						<SearchIcon className="me-1.5 h-4 w-4" />
+						<Trans>Search</Trans>
+						<span className="flex items-center ms-3.5">
+							<Kbd>{isMac ? "⌘" : "Ctrl"}</Kbd>
+							<Kbd>K</Kbd>
+						</span>
+					</span>
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon"
+					className="lg:hidden"
+					aria-label="Search"
+					onClick={() => setCommandPaletteOpen(true)}
+				>
 					<SearchIcon className="h-[1.2rem] w-[1.2rem]" />
 				</Button>
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						onMouseEnter={() => import("@/components/routes/settings/general")}
-						className="ms-3"
-						aria-label="Open Menu"
-					>
-						<MenuIcon />
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end">
-						<DropdownMenuLabel className="max-w-40 truncate">{pb.authStore.record?.email}</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "containers"))}
-								className="flex items-center"
-							>
-								<ContainerIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<Trans>All Containers</Trans>
-							</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => navigate(getPagePath($router, "smart"))} className="flex items-center">
-								<HardDriveIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<span>S.M.A.R.T.</span>
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "monitors"))}
-								className="flex items-center"
-							>
-								<NetworkIcon className="h-4 w-4 me-2.5" strokeWidth={1.5} />
-								<Trans>Network Monitors</Trans>
-							</DropdownMenuItem>
-							<DropdownMenuItem
-								onClick={() => navigate(getPagePath($router, "settings", { name: "general" }))}
-								className="flex items-center"
-							>
-								<SettingsIcon className="h-4 w-4 me-2.5" />
-								<Trans>Settings</Trans>
-							</DropdownMenuItem>
-							{isAdmin() && (
-								<DropdownMenuSub>
-									<DropdownMenuSubTrigger>
-										<UserIcon className="h-4 w-4 me-2.5" />
-										<Trans>Admin</Trans>
-									</DropdownMenuSubTrigger>
-									<DropdownMenuSubContent>{AdminLinks}</DropdownMenuSubContent>
-								</DropdownMenuSub>
-							)}
-							{!isReadOnlyUser() && (
-								<DropdownMenuItem
-									className="flex items-center"
-									onSelect={() => {
-										setAddSystemDialogOpen(true)
-									}}
-								>
-									<PlusIcon className="h-4 w-4 me-2.5" />
-									<Trans>Add System</Trans>
-								</DropdownMenuItem>
-							)}
-						</DropdownMenuGroup>
-						<DropdownMenuSeparator />
-						<DropdownMenuGroup>
-							<DropdownMenuItem onSelect={logOut} className="flex items-center">
-								<LogOutIcon className="h-4 w-4 me-2.5" />
-								<Trans>Log Out</Trans>
-							</DropdownMenuItem>
-						</DropdownMenuGroup>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			{/* desktop nav */}
-			{/** biome-ignore lint/a11y/noStaticElementInteractions: ignore */}
-			<div
-				className="hidden md:flex items-center ms-auto"
-				onMouseEnter={() => import("@/components/routes/settings/general")}
-			>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "containers")}
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Containers"
-						>
-							<ContainerIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>All Containers</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "smart")}
-							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="S.M.A.R.T."
-						>
-							<HardDriveIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>S.M.A.R.T.</TooltipContent>
-				</Tooltip>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "monitors")}
-							className={cn("hidden md:grid", buttonVariants({ variant: "ghost", size: "icon" }))}
-							aria-label="Network Monitors"
-							onMouseEnter={() => import("@/components/routes/monitors")}
-						>
-							<NetworkIcon className="h-[1.2rem] w-[1.2rem]" strokeWidth={1.5} />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Network Monitors</Trans>
-					</TooltipContent>
-				</Tooltip>
 				<ModeToggle />
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link
-							href={getPagePath($router, "settings", { name: "general" })}
-							aria-label="Settings"
-							className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}
-						>
-							<SettingsIcon className="h-[1.2rem] w-[1.2rem]" />
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent>
-						<Trans>Settings</Trans>
-					</TooltipContent>
-				</Tooltip>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<button aria-label="User Actions" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
-							<UserIcon className="h-[1.2rem] w-[1.2rem]" />
-						</button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align={isReadOnlyUser() ? "end" : "center"} className="min-w-44">
-						<DropdownMenuLabel>{pb.authStore.record?.email}</DropdownMenuLabel>
-						<DropdownMenuSeparator />
-						{isAdmin() && (
-							<>
-								{AdminLinks}
-								<DropdownMenuSeparator />
-							</>
-						)}
-						<DropdownMenuItem onSelect={logOut}>
-							<LogOutIcon className="me-2.5 h-4 w-4" />
-							<span>
-								<Trans>Log Out</Trans>
-							</span>
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
 				{!isReadOnlyUser() && (
 					<Button variant="outline" className="flex gap-1 ms-2" onClick={() => setAddSystemDialogOpen(true)}>
 						<PlusIcon className="h-4 w-4 -ms-1" />
-						<Trans>Add System</Trans>
+						<span className="hidden sm:inline">
+							<Trans>Add System</Trans>
+						</span>
 					</Button>
 				)}
 			</div>
-		</div>
+		</header>
+	)
+}
+
+/** Group > page (> system name) trail for the current route, based on the sidebar navigation */
+function Breadcrumbs() {
+	const page = useStore($router)
+	const systemId = page?.route === "system" ? page.params.id : ""
+	const system = useStore($allSystemsById, { keys: [systemId] })[systemId]
+
+	let crumbs: { title: React.ReactNode; href?: string }[] = []
+	for (const group of getNavGroups()) {
+		const item = group.items.find((item) => item.isActive(page))
+		if (item) {
+			crumbs = [{ title: group.label }, { title: item.title, href: item.href }]
+			break
+		}
+	}
+	if (system) {
+		crumbs.push({ title: system.name })
+	}
+	if (!crumbs.length) {
+		return null
+	}
+
+	return (
+		<Breadcrumb className="min-w-0">
+			<BreadcrumbList className="flex-nowrap">
+				{crumbs.map((crumb, i) => {
+					const last = i === crumbs.length - 1
+					return (
+						<Fragment key={i}>
+							{i > 0 && <BreadcrumbSeparator className="hidden md:block" />}
+							<BreadcrumbItem className={cn(!last && "hidden md:inline-flex", last && "min-w-0")}>
+								{last ? (
+									<BreadcrumbPage className="truncate">{crumb.title}</BreadcrumbPage>
+								) : crumb.href ? (
+									<BreadcrumbLink asChild>
+										<Link href={crumb.href}>{crumb.title}</Link>
+									</BreadcrumbLink>
+								) : (
+									crumb.title
+								)}
+							</BreadcrumbItem>
+						</Fragment>
+					)
+				})}
+			</BreadcrumbList>
+		</Breadcrumb>
 	)
 }
 
@@ -253,42 +132,3 @@ const Kbd = ({ children }: { children: React.ReactNode }) => (
 		{children}
 	</kbd>
 )
-
-function AdminDropdownGroup() {
-	return (
-		<DropdownMenuGroup>
-			<DropdownMenuItem asChild>
-				<a href={prependBasePath("/_/#/collections?collection=users")} target="_blank">
-					<UsersIcon className="me-2.5 h-4 w-4" />
-					<span>
-						<Trans>Users</Trans>
-					</span>
-				</a>
-			</DropdownMenuItem>
-			<DropdownMenuItem asChild>
-				<a href={prependBasePath("/_/#/collections?collection=systems")} target="_blank">
-					<ServerIcon className="me-2.5 h-4 w-4" />
-					<span>
-						<Trans>Systems</Trans>
-					</span>
-				</a>
-			</DropdownMenuItem>
-			<DropdownMenuItem asChild>
-				<a href={prependBasePath("/_/#/logs")} target="_blank">
-					<LogsIcon className="me-2.5 h-4 w-4" />
-					<span>
-						<Trans>Logs</Trans>
-					</span>
-				</a>
-			</DropdownMenuItem>
-			<DropdownMenuItem asChild>
-				<a href={prependBasePath("/_/#/settings/backups")} target="_blank">
-					<DatabaseBackupIcon className="me-2.5 h-4 w-4" />
-					<span>
-						<Trans>Backups</Trans>
-					</span>
-				</a>
-			</DropdownMenuItem>
-		</DropdownMenuGroup>
-	)
-}

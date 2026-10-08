@@ -1,7 +1,6 @@
 import { useLingui } from "@lingui/react/macro"
 import { memo, useEffect, useMemo } from "react"
 import ContainersTable from "@/components/containers-table/containers-table"
-import { FooterRepoLink } from "@/components/footer-repo-link"
 
 export default memo(() => {
 	const { t } = useLingui()
@@ -14,7 +13,6 @@ export default memo(() => {
 		() => (
 			<>
 				<ContainersTable />
-				<FooterRepoLink />
 			</>
 		),
 		[]
