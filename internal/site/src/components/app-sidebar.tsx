@@ -5,6 +5,7 @@ import {
 	AlertOctagonIcon,
 	ArrowUpRightIcon,
 	BellIcon,
+	ChevronDownIcon,
 	ChevronsUpDownIcon,
 	CircleArrowUpIcon,
 	ContainerIcon,
@@ -25,6 +26,7 @@ import {
 	UsersIcon,
 } from "lucide-react"
 import type React from "react"
+import { useState } from "react"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -49,7 +51,7 @@ import {
 } from "@/components/ui/sidebar"
 import { isAdmin, isReadOnlyUser, logOut, pb } from "@/lib/api"
 import { $direction, $newVersion } from "@/lib/stores"
-import { runOnce } from "@/lib/utils"
+import { cn, runOnce } from "@/lib/utils"
 import { Logo } from "./logo"
 import { useThemeCycle } from "./mode-toggle"
 import { $router, basePath, Link, prependBasePath } from "./router"
@@ -69,6 +71,8 @@ export interface NavItem {
 export interface NavGroup {
 	label: React.ReactNode
 	items: NavItem[]
+	/** localStorage key for a group that can be collapsed (starts collapsed) */
+	collapseKey?: string
 }
 
 const settingsItem = (
@@ -177,6 +181,7 @@ export function getNavGroups(): NavGroup[] {
 		})
 		groups.push({
 			label: <Trans>Admin</Trans>,
+			collapseKey: "besz-nav-admin",
 			items: [
 				adminItem(<Trans>Users</Trans>, "Users", "/_/#/collections?collection=users", UsersIcon),
 				adminItem(<Trans>Systems</Trans>, "Systems", "/_/#/collections?collection=systems", ServerIcon),
@@ -220,8 +225,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 			</SidebarHeader>
 			<SidebarContent>
 				{groups.map((group, i) => (
-					<SidebarGroup key={i}>
-						<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+					<NavGroupSection key={i} group={group}>
 						<SidebarMenu>
 							{group.items.map((item) => (
 								<SidebarMenuItem key={item.href}>
@@ -245,7 +249,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 								</SidebarMenuItem>
 							))}
 						</SidebarMenu>
-					</SidebarGroup>
+					</NavGroupSection>
 				))}
 			</SidebarContent>
 			<SidebarFooter>
@@ -254,6 +258,40 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>
+	)
+}
+
+function NavGroupSection({ group, children }: { group: NavGroup; children: React.ReactNode }) {
+	const { state, isMobile } = useSidebar()
+	const key = group.collapseKey
+	const [open, setOpen] = useState(() => !key || localStorage.getItem(key) === "1")
+
+	if (!key) {
+		return (
+			<SidebarGroup>
+				<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+				{children}
+			</SidebarGroup>
+		)
+	}
+
+	const toggle = () => {
+		setOpen(!open)
+		localStorage.setItem(key, open ? "0" : "1")
+	}
+	// the label is hidden in icon mode, so always show the items there
+	const expanded = open || (state === "collapsed" && !isMobile)
+
+	return (
+		<SidebarGroup>
+			<SidebarGroupLabel asChild className="cursor-pointer hover:text-sidebar-foreground">
+				<button type="button" onClick={toggle} aria-expanded={expanded}>
+					{group.label}
+					<ChevronDownIcon className={cn("ms-auto transition-transform", !open && "-rotate-90 rtl:rotate-90")} />
+				</button>
+			</SidebarGroupLabel>
+			{expanded && children}
+		</SidebarGroup>
 	)
 }
 
