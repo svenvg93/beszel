@@ -11,7 +11,7 @@ import {
 	type MonitorProtocol as Protocol,
 	PROTOCOL_LABELS,
 	PROTOCOLS,
-	withMonitorGaps,
+	withMonitorsGaps,
 } from "@/lib/network-monitor-utils"
 import { $allSystemsById, $direction, getUserChartTime } from "@/lib/stores"
 import { useProtocolMonitorStats } from "@/lib/use-network-monitors"
@@ -173,13 +173,11 @@ const TargetChart = memo(function TargetChart({
 	const systems = useStore($allSystemsById)
 	const getLabel = useCallback((m: NetworkMonitorRecord) => systems[m.system]?.name ?? m.system, [systems])
 
-	// Keep only this target's records, so a single line isn't broken up by other monitors' timestamps.
-	const stats = useMemo(() => {
-		if (monitors.length === 1) {
-			return withMonitorGaps(monitorStats, monitors[0], chartTimeData[chartData.chartTime].expectedInterval)
-		}
-		return monitorStats.filter((record) => monitors.some((m) => record.stats?.[m.id] != null))
-	}, [monitorStats, monitors, chartData.chartTime])
+	// Only this target's records, with breaks at failed probes and missing data (see withMonitorsGaps).
+	const stats = useMemo(
+		() => withMonitorsGaps(monitorStats, monitors, chartTimeData[chartData.chartTime].expectedInterval),
+		[monitorStats, monitors, chartData.chartTime]
+	)
 	return (
 		<ResponseLossChart
 			monitorStats={stats}

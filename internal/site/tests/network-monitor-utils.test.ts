@@ -5,7 +5,7 @@ mock.module("@lingui/core/macro", () => ({
 	plural: (_count: number, forms: { other?: string }) => forms.other ?? "",
 }))
 
-const { getMonitorStats, mergeMonitorStats, mergeSameTimestamps, withMonitorGaps } = await import(
+const { getMonitorStats, mergeMonitorStats, mergeSameTimestamps, withMonitorGaps, withMonitorsGaps } = await import(
 	"../src/lib/network-monitor-utils"
 )
 
@@ -122,5 +122,77 @@ describe("merging stats across monitors", () => {
 		const remaining = mergeSameTimestamps(existing, late)
 		expect(Object.keys(existing[0].stats).sort()).toEqual(["a", "b"])
 		expect(remaining.map((r) => r.created)).toEqual([120_000])
+	})
+})
+
+describe("gaps across several monitors", () => {
+	const minute = 60_000
+	const ok = (res_avg: number) => ({ res_avg, res_min: res_avg, res_max: res_avg, loss: 0 })
+	const failed = { res_avg: null, res_min: null, res_max: null, loss: 100 }
+	const a = { id: "a", interval: 30 }
+	const b = { id: "b", interval: 30 }
+
+	test("breaks the response line where every probe failed", () => {
+		const records = [
+			{ created: 0, stats: { a: ok(10), b: ok(20) } },
+			{ created: minute, stats: { a: failed, b: failed } },
+			{ created: 2 * minute, stats: { a: ok(12), b: ok(22) } },
+		]
+		const result = withMonitorsGaps(records, [a, b], minute)
+		expect(result).toHaveLength(3)
+		expect(result[1].stats.a.res_avg).toBeNull()
+		expect(result[1].stats.a.loss).toBe(100)
+	})
+
+	test("fills a sample missing from one bucket by interpolating", () => {
+		// b's sample for the second minute was moved into another bucket by jitter
+		const records = [
+			{ created: 0, stats: { a: ok(10), b: ok(20) } },
+			{ created: minute, stats: { a: ok(10) } },
+			{ created: 2 * minute, stats: { a: ok(10), b: ok(30) } },
+		]
+		const result = withMonitorsGaps(records, [a, b], minute)
+		expect(result[1].stats.b.res_avg).toBe(25)
+		// the cached record is not changed
+		expect(records[1].stats).not.toHaveProperty("b")
+	})
+
+	test("doesn't fill across a failed probe", () => {
+		const records = [
+			{ created: 0, stats: { a: failed, b: ok(20) } },
+			{ created: minute, stats: { b: ok(20) } },
+			{ created: 2 * minute, stats: { a: ok(10), b: ok(20) } },
+		]
+		const result = withMonitorsGaps(records, [a, b], minute)
+		expect(result[1].stats.a.res_avg).toBeNull()
+	})
+
+	test("leaves a monitor empty during its own outage", () => {
+		const records = [
+			{ created: 0, stats: { a: ok(10), b: ok(20) } },
+			...[1, 2, 3, 4].map((i) => ({ created: i * minute, stats: { b: ok(20) } })),
+			{ created: 5 * minute, stats: { a: ok(10), b: ok(20) } },
+		]
+		const result = withMonitorsGaps(records, [a, b], minute)
+		expect(result.slice(1, 5).every((record) => record.stats.a == null)).toBe(true)
+	})
+
+	test("inserts a gap marker when no monitor reported for a while", () => {
+		const records = [
+			{ created: 0, stats: { a: ok(10), b: ok(20) } },
+			{ created: 10 * minute, stats: { a: ok(10), b: ok(20) } },
+		]
+		const result = withMonitorsGaps(records, [a, b], minute)
+		expect(result).toHaveLength(3)
+		expect(result[1].created).toBeNull()
+	})
+
+	test("matches withMonitorGaps for a single monitor", () => {
+		const records = [
+			{ created: 0, stats: { a: ok(10) } },
+			{ created: minute, stats: { a: ok(11) } },
+			{ created: 10 * minute, stats: { a: ok(12) } },
+		]
+		expect(withMonitorsGaps(records, [a], minute)).toEqual(withMonitorGaps(records, a, minute))
 	})
 })

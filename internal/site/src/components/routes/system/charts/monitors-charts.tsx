@@ -201,8 +201,8 @@ export function ResponseLossChart({
 				dataPoints={dataPoints}
 				domain={["auto", "auto"]}
 				domain2={[0, 100]}
-				// Monitors on different systems don't share timestamps; a single monitor's stats already have gap markers.
-				connectNulls={count > 1}
+				// Callers prepare the records (see withMonitorsGaps), so missing values are real gaps.
+				connectNulls={false}
 				tickFormatter={(value) => formatMicroseconds(value, false)}
 				tickFormatter2={(value) => `${toFixedFloat(value, value >= 10 ? 0 : 1)}%`}
 				contentFormatter={({ value, name }) => {
