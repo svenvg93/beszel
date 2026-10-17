@@ -104,7 +104,10 @@ export {
 	getMonitorStatus,
 	getMonitorTarget,
 	isHttpsTarget,
+	type MonitorProtocol,
 	type MonitorStatus,
+	PROTOCOL_LABELS,
+	PROTOCOLS,
 } from "./monitor-compare"
 
 /** Whole days until the certificate expires; negative once expired. */

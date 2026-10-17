@@ -4,11 +4,11 @@ import {
 	getMonitorProtocolLabel,
 	getMonitorStatus,
 	getMonitorTarget,
+	type MonitorProtocol as Protocol,
 	type MonitorStatus,
+	PROTOCOL_LABELS,
+	PROTOCOLS,
 } from "@/lib/network-monitor-utils"
-import NetworkMonitorsCharts from "./network-monitors-charts"
-
-type MonitorView = "table" | "charts"
 import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import {
@@ -36,7 +36,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { subscribeKeys } from "nanostores"
 import { getMonitorColumns } from "@/components/network-monitors-table/network-monitors-columns"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
@@ -91,6 +91,10 @@ import { Separator } from "../ui/separator"
 import { $router, Link } from "../router"
 import { getPagePath } from "@nanostores/router"
 
+const NetworkMonitorsCharts = lazy(() => import("./network-monitors-charts"))
+
+type MonitorView = "table" | "charts"
+
 export default function NetworkMonitorsTableNew({
 	systemId,
 	monitors,
@@ -116,6 +120,15 @@ export default function NetworkMonitorsTableNew({
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 	const [globalFilter, setGlobalFilter] = useState("")
 	const [statusFilter, setStatusFilter] = useState<MonitorStatus | "all">("all")
+	const [hiddenProtocols, setHiddenProtocols] = useState<Set<Protocol>>(() => new Set())
+	const toggleProtocol = useCallback((protocol: Protocol, visible: boolean) => {
+		setHiddenProtocols((prev) => {
+			const next = new Set(prev)
+			if (visible) next.delete(protocol)
+			else next.add(protocol)
+			return next
+		})
+	}, [])
 	// The charts dashboard is only offered for all systems' monitors.
 	const [view, setView] = useState<MonitorView>(
 		() =>
@@ -313,13 +326,17 @@ export default function NetworkMonitorsTableNew({
 	}, [canManageMonitors, handleDeleteRequest, handleSetEnabled, systemId, longestTarget, $longestSystemName])
 
 	const systems = useStore($allSystemsById)
-	const statusFilteredMonitors = useMemo(() => {
-		if (statusFilter === "all") return monitors
-		return monitors.filter((monitor) => getMonitorStatus(monitor, systems[monitor.system]?.status) === statusFilter)
-	}, [monitors, statusFilter, systems])
+	const filteredMonitors = useMemo(() => {
+		if (statusFilter === "all" && !hiddenProtocols.size) return monitors
+		return monitors.filter(
+			(monitor) =>
+				!hiddenProtocols.has(monitor.protocol) &&
+				(statusFilter === "all" || getMonitorStatus(monitor, systems[monitor.system]?.status) === statusFilter)
+		)
+	}, [monitors, statusFilter, hiddenProtocols, systems])
 
 	const table = useReactTable({
-		data: statusFilteredMonitors,
+		data: filteredMonitors,
 		columns,
 		getRowId: (row) => row.id,
 		getCoreRowModel: getCoreRowModel(),
@@ -451,6 +468,25 @@ export default function NetworkMonitorsTableNew({
 											</DropdownMenuRadioItem>
 										</DropdownMenuRadioGroup>
 									</div>
+									<div className="border-r">
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<ArrowLeftRightIcon className="size-4" />
+											<Trans>Protocol</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<div className="px-1.5 pb-1">
+											{PROTOCOLS.map((protocol) => (
+												<DropdownMenuCheckboxItem
+													key={protocol}
+													onSelect={(e) => e.preventDefault()}
+													checked={!hiddenProtocols.has(protocol)}
+													onCheckedChange={(checked) => toggleProtocol(protocol, !!checked)}
+												>
+													{PROTOCOL_LABELS[protocol]}
+												</DropdownMenuCheckboxItem>
+											))}
+										</div>
+									</div>
 									<div className={cn("border-r", showCharts && "hidden")}>
 										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
 											<ArrowUpDownIcon className="size-4" />
@@ -558,7 +594,9 @@ export default function NetworkMonitorsTableNew({
 				</div>
 			</CardHeader>
 			{showCharts ? (
-				<NetworkMonitorsCharts monitors={chartMonitors} />
+				<Suspense fallback={<LoaderCircleIcon className="animate-spin size-10 opacity-60 mx-auto my-12" />}>
+					<NetworkMonitorsCharts monitors={chartMonitors} />
+				</Suspense>
 			) : (
 				<div className="rounded-md">
 					<NetworkMonitorsTable

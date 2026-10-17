@@ -5,7 +5,13 @@ import type { NetworkMonitorRecord } from "@/types"
 /** Most lines a comparison charts, to keep it readable and the stats request's filter short. */
 export const MAX_COMPARE_MONITORS = 24
 
-type MonitorTarget = Pick<NetworkMonitorRecord, "target" | "protocol" | "port">
+export type MonitorProtocol = NetworkMonitorRecord["protocol"]
+
+/** Protocols in display order. */
+export const PROTOCOLS: MonitorProtocol[] = ["icmp", "tcp", "http", "dns"]
+export const PROTOCOL_LABELS: Record<MonitorProtocol, string> = { icmp: "ICMP", tcp: "TCP", http: "HTTP(S)", dns: "DNS" }
+
+type MonitorTarget =Pick<NetworkMonitorRecord, "target" | "protocol" | "port">
 
 export function getMonitorTarget(monitor: MonitorTarget) {
 	// The protocol column already says http, so the URL scheme is redundant.

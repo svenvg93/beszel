@@ -4,22 +4,23 @@ import { atom } from "nanostores"
 import { ChevronDownIcon } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
-import { LossChart, ResponseChart } from "@/components/routes/system/charts/monitors-charts"
+import { ResponseLossChart } from "@/components/routes/system/charts/monitors-charts"
 import { Button } from "@/components/ui/button"
 import { getMonitorIdentityKey } from "@/lib/monitor-compare"
-import { getMonitorLabels, withMonitorGaps } from "@/lib/network-monitor-utils"
+import {
+	getMonitorLabels,
+	type MonitorProtocol as Protocol,
+	PROTOCOL_LABELS,
+	PROTOCOLS,
+	withMonitorGaps,
+} from "@/lib/network-monitor-utils"
+import { useIntersectionObserver } from "@/lib/use-intersection-observer"
 import { $allSystemsById, $direction, getUserChartTime } from "@/lib/stores"
 import { useProtocolMonitorStats } from "@/lib/use-network-monitors"
 import { chartTimeData, cn, parseSemVer } from "@/lib/utils"
 import type { ChartOptions, ChartTimes, NetworkMonitorRecord, NetworkMonitorStatsRecord } from "@/types"
 import { SystemMultiSelect } from "./monitor-dialog"
 
-type Protocol = NetworkMonitorRecord["protocol"]
-
-const PROTOCOLS: Protocol[] = ["icmp", "tcp", "http", "dns"]
-const PROTOCOL_LABELS: Record<Protocol, string> = { icmp: "ICMP", tcp: "TCP", http: "HTTP(S)", dns: "DNS" }
-/** All panels share one hover crosshair. */
-const SYNC_ID = "network-monitors"
 const COLLAPSED_STORAGE_KEY = "besz-monitor-charts-collapsed"
 
 function loadCollapsed(): Set<string> {
@@ -130,7 +131,9 @@ const ProtocolSection = memo(function ProtocolSection({
 	onToggle: (protocol: Protocol) => void
 }) {
 	// Stats cover the whole protocol, so filtering monitors doesn't refetch.
-	const monitorStats = useProtocolMonitorStats(protocol, chartData.chartTime, !collapsed)
+	// Fetch once the section is near the viewport, like the system page's lazy tables. Stays loaded after.
+	const { isIntersecting, ref } = useIntersectionObserver({ rootMargin: "90px" })
+	const monitorStats = useProtocolMonitorStats(protocol, chartData.chartTime, !collapsed && isIntersecting)
 
 	// One chart per target, with a line for each system that probes it.
 	const targets = useMemo(() => {
@@ -153,7 +156,7 @@ const ProtocolSection = memo(function ProtocolSection({
 	}, [monitors])
 
 	return (
-		<section className="grid gap-3">
+		<section ref={ref} className="grid gap-3">
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 				<Button
 					variant="ghost"
@@ -166,16 +169,25 @@ const ProtocolSection = memo(function ProtocolSection({
 					<span className="font-normal text-muted-foreground tabular-nums">{targets.length}</span>
 				</Button>
 			</div>
-			{!collapsed &&
-				targets.map(({ key, title, monitors }) => (
-					<TargetCharts key={key} title={title} monitors={monitors} monitorStats={monitorStats} chartData={chartData} />
-				))}
+			{!collapsed && (
+				<div className="grid xl:grid-cols-2 gap-4">
+					{targets.map(({ key, title, monitors }) => (
+						<TargetChart
+							key={key}
+							title={title}
+							monitors={monitors}
+							monitorStats={monitorStats}
+							chartData={chartData}
+						/>
+					))}
+				</div>
+			)}
 		</section>
 	)
 })
 
-/** Response and loss charts for one target, with a line for each system that probes it. */
-const TargetCharts = memo(function TargetCharts({
+/** Response and loss for one target, with lines for each system that probes it. */
+const TargetChart = memo(function TargetChart({
 	title,
 	monitors,
 	monitorStats,
@@ -196,35 +208,14 @@ const TargetCharts = memo(function TargetCharts({
 		}
 		return monitorStats.filter((record) => monitors.some((m) => record.stats?.[m.id] != null))
 	}, [monitorStats, monitors, chartData.chartTime])
-	const empty = stats.length === 0
-	const legend = monitors.length > 1 && monitors.length < 10
-
 	return (
-		<div className="grid xl:grid-cols-2 gap-4">
-			<ResponseChart
-				monitorStats={stats}
-				grid
-				monitors={monitors}
-				chartData={chartData}
-				empty={empty}
-				getLabel={getLabel}
-				showFilter={false}
-				legend={legend}
-				syncId={SYNC_ID}
-				titlePrefix={title}
-			/>
-			<LossChart
-				monitorStats={stats}
-				grid
-				monitors={monitors}
-				chartData={chartData}
-				empty={empty}
-				getLabel={getLabel}
-				showFilter={false}
-				legend={legend}
-				syncId={SYNC_ID}
-				titlePrefix={title}
-			/>
-		</div>
+		<ResponseLossChart
+			monitorStats={stats}
+			monitors={monitors}
+			chartData={chartData}
+			empty={stats.length === 0}
+			title={title}
+			getLabel={getLabel}
+		/>
 	)
 })

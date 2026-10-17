@@ -66,7 +66,9 @@ async function fetchMonitorStats(
 	{ expr, params }: { expr: string; params: Record<string, string> },
 	bucketMs: number,
 	chartTime: ChartTimes,
-	cached?: NetworkMonitorStatsRecord[]
+	cached?: NetworkMonitorStatsRecord[],
+	/** The SDK cancels a pending request with the same key; by default that's any request to this collection. */
+	requestKey?: string
 ): Promise<NetworkMonitorStatsRecord[]> {
 	const lastCached = cached?.at(-1)?.created as number | undefined
 	// Bucketed timestamps are floored, so refetch the whole last bucket; mergeSameTimestamps folds in the overlap.
@@ -81,6 +83,7 @@ async function fetchMonitorStats(
 		sort: "created",
 		// PocketBase's page limit; each page re-scans the range up to its offset, so fewer pages is faster.
 		batch: 1000,
+		requestKey,
 	})
 	return mergeMonitorStats(rawRecords, bucketMs)
 }
@@ -357,12 +360,14 @@ export function useProtocolMonitorStats(
 		const cachedMonitorStats = getCacheValue(cacheKey, chartTime)
 		const lastCreated = cachedMonitorStats.at(-1)?.created
 		if (!lastCreated || Date.now() - lastCreated >= expectedInterval * 0.9) {
-			fetchMonitorStats(filter, bucketMs, chartTime, cachedMonitorStats)
+			// Sections fetch at the same time, so each protocol needs its own request key. A newer request
+			// for the same protocol (e.g. after changing the time range) still cancels a stale one.
+			fetchMonitorStats(filter, bucketMs, chartTime, cachedMonitorStats, cacheKey)
 				.then((newMonitorStats) => {
 					if (!cancelled) setMonitorStats(appendCacheValue(cacheKey, chartTime, newMonitorStats))
 				})
 				.catch((error) => {
-					if (!cancelled) console.error("Failed to fetch monitor stats:", error)
+					if (!cancelled && !error?.isAbort) console.error("Failed to fetch monitor stats:", error)
 				})
 		}
 
