@@ -22,6 +22,10 @@ type MonitorChartProps = {
 	getLabel?: (monitor: NetworkMonitorRecord) => string
 	/** Filter store for the chart's filter bar. Pass a local atom to keep the filter scoped to one view. */
 	filterStore?: typeof $monitorFilter
+	/** Charts with the same syncId share the hover crosshair, matched by timestamp. */
+	syncId?: string
+	/** Show the legend. Defaults to showing it for fewer than 10 lines when the filter bar is shown. */
+	legend?: boolean
 }
 
 type MonitorChartBaseProps = MonitorChartProps & {
@@ -51,6 +55,8 @@ function MonitorChart({
 	getLabel = getMonitorTarget,
 	filterStore = $monitorFilter,
 	showFilter = monitors.length > 1,
+	syncId,
+	legend: legendProp,
 }: MonitorChartBaseProps) {
 	const storedFilter = useStore(filterStore)
 	const filter = showFilter ? storedFilter : ""
@@ -93,7 +99,8 @@ function MonitorChart({
 		return monitorStats.filter((record) => visibleKeys.some((id) => record.stats?.[id] != null))
 	}, [monitorStats, visibleKeys, multipleMonitors])
 
-	const legend = dataPoints.length < 10 && showFilter
+	const legend = legendProp ?? (dataPoints.length < 10 && showFilter)
+	const chartProps = useMemo(() => (syncId ? { syncId, syncMethod: "value" as const } : undefined), [syncId])
 
 	return (
 		<ChartCard
@@ -115,6 +122,7 @@ function MonitorChart({
 				contentFormatter={contentFormatter}
 				legend={legend}
 				filter={filter}
+				chartProps={chartProps}
 			/>
 		</ChartCard>
 	)
@@ -212,6 +220,8 @@ export function ResponseChart({
 	getLabel,
 	filterStore,
 	showFilter,
+	syncId,
+	legend,
 }: MonitorChartProps) {
 	const { t } = useLingui()
 	const responseTitle = t`Response`
@@ -230,6 +240,8 @@ export function ResponseChart({
 			getLabel={getLabel}
 			filterStore={filterStore}
 			showFilter={showFilter}
+			syncId={syncId}
+			legend={legend}
 			tickFormatter={(value) => formatMicroseconds(value, false)}
 			contentFormatter={({ value }) => {
 				if (typeof value !== "number") {
@@ -251,6 +263,8 @@ export function LossChart({
 	getLabel,
 	filterStore,
 	showFilter,
+	syncId,
+	legend,
 }: MonitorChartProps) {
 	const { t } = useLingui()
 	const lossTitle = t({ message: "Loss", context: "Packet loss" })
@@ -272,6 +286,8 @@ export function LossChart({
 			getLabel={getLabel}
 			filterStore={filterStore}
 			showFilter={showFilter}
+			syncId={syncId}
+			legend={legend}
 			tickFormatter={(value) => `${toFixedFloat(value, value >= 10 ? 0 : 1)}%`}
 			contentFormatter={({ value }) => {
 				if (typeof value !== "number") {

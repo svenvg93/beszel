@@ -98,7 +98,14 @@ export function mergeMonitorStats(rawRecords: RawMonitorStatsRecord[], bucketMs 
 		.map(([created, stats]) => ({ created, stats }))
 }
 
-export { getMonitorProtocolLabel, getMonitorTarget, isHttpsTarget } from "./monitor-compare"
+export {
+	getMonitorLabels,
+	getMonitorProtocolLabel,
+	getMonitorStatus,
+	getMonitorTarget,
+	isHttpsTarget,
+	type MonitorStatus,
+} from "./monitor-compare"
 
 /** Whole days until the certificate expires; negative once expired. */
 export function getCertDaysLeft(cert: Pick<MonitorCertInfo, "expires">, now = Date.now()) {

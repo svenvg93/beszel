@@ -2,8 +2,13 @@ import {
 	getCertDaysLeft,
 	getCertExpiryLevel,
 	getMonitorProtocolLabel,
+	getMonitorStatus,
 	getMonitorTarget,
+	type MonitorStatus,
 } from "@/lib/network-monitor-utils"
+import NetworkMonitorsCharts from "./network-monitors-charts"
+
+type MonitorView = "table" | "charts"
 import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import {
@@ -50,10 +55,14 @@ import {
 	ArrowLeftRightIcon,
 	ArrowUpDownIcon,
 	ArrowUpIcon,
+	ChartLineIcon,
 	EthernetPortIcon,
 	EyeIcon,
+	FilterIcon,
 	GlobeIcon,
 	LandmarkIcon,
+	LayoutGridIcon,
+	LayoutListIcon,
 	LoaderCircleIcon,
 	ServerIcon,
 	Settings2Icon,
@@ -66,6 +75,8 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -104,6 +115,15 @@ export default function NetworkMonitorsTableNew({
 	)
 	const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 	const [globalFilter, setGlobalFilter] = useState("")
+	const [statusFilter, setStatusFilter] = useState<MonitorStatus | "all">("all")
+	// The charts dashboard is only offered for all systems' monitors.
+	const [view, setView] = useState<MonitorView>(
+		() =>
+			$userSettings.get().monitorView ??
+			(JSON.parse(localStorage.getItem("besz-monitor-view") || "null") as MonitorView | null) ??
+			"table"
+	)
+	const showCharts = !systemId && view === "charts"
 	const [deleteOpen, setDeleteOpen] = useState(false)
 	const [pendingDelete, setPendingDelete] = useState<NetworkMonitorRecord[]>([])
 	const [editingMonitor, setEditingMonitor] = useState<NetworkMonitorRecord>()
@@ -114,10 +134,14 @@ export default function NetworkMonitorsTableNew({
 	// Apply settings from server once they load (handles incognito / new devices)
 	const appliedSettings = useRef(new Set<string>())
 	useEffect(() => {
-		return subscribeKeys($userSettings, ["monitorCols", sortSettingsKey], (vals) => {
+		return subscribeKeys($userSettings, ["monitorCols", "monitorView", sortSettingsKey], (vals) => {
 			if (!appliedSettings.current.has("monitorCols") && vals.monitorCols !== undefined) {
 				appliedSettings.current.add("monitorCols")
 				setColumnVisibility(vals.monitorCols)
+			}
+			if (!appliedSettings.current.has("monitorView") && vals.monitorView !== undefined) {
+				appliedSettings.current.add("monitorView")
+				setView(vals.monitorView)
 			}
 			if (!appliedSettings.current.has(sortSettingsKey) && vals[sortSettingsKey] !== undefined) {
 				appliedSettings.current.add(sortSettingsKey)
@@ -138,6 +162,14 @@ export default function NetworkMonitorsTableNew({
 		},
 		[]
 	)
+
+	const handleViewChange = useCallback((value: string) => {
+		const next = value as MonitorView
+		setView(next)
+		localStorage.setItem("besz-monitor-view", JSON.stringify(next))
+		$userSettings.setKey("monitorView", next)
+		queueUserSettings({ monitorView: next })
+	}, [])
 
 	const handleSortingChange = useCallback(
 		(updater: SortingState | ((prev: SortingState) => SortingState)) => {
@@ -280,8 +312,14 @@ export default function NetworkMonitorsTableNew({
 		return columns
 	}, [canManageMonitors, handleDeleteRequest, handleSetEnabled, systemId, longestTarget, $longestSystemName])
 
+	const systems = useStore($allSystemsById)
+	const statusFilteredMonitors = useMemo(() => {
+		if (statusFilter === "all") return monitors
+		return monitors.filter((monitor) => getMonitorStatus(monitor, systems[monitor.system]?.status) === statusFilter)
+	}, [monitors, statusFilter, systems])
+
 	const table = useReactTable({
-		data: monitors,
+		data: statusFilteredMonitors,
 		columns,
 		getRowId: (row) => row.id,
 		getCoreRowModel: getCoreRowModel(),
@@ -317,6 +355,8 @@ export default function NetworkMonitorsTableNew({
 	})
 
 	const rows = table.getRowModel().rows
+	// Same rows as the table, so the text and status filters apply to the charts too.
+	const chartMonitors = useMemo(() => rows.map((row) => row.original), [rows])
 	const visibleColumns = table.getVisibleLeafColumns()
 	const visibleColumnsKey = visibleColumns.map((column) => column.id).join(",")
 
@@ -363,8 +403,55 @@ export default function NetworkMonitorsTableNew({
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="h-72 md:h-auto min-w-48 md:min-w-auto overflow-y-auto">
-								<div className="grid grid-cols-2 divide-y md:divide-s md:divide-y-0">
+								<div className="grid grid-cols-1 md:grid-flow-col md:auto-cols-fr divide-y md:divide-s md:divide-y-0">
+									{!systemId && (
+										<div className="border-r">
+											<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+												<LayoutGridIcon className="size-4" />
+												<Trans>Layout</Trans>
+											</DropdownMenuLabel>
+											<DropdownMenuSeparator />
+											<DropdownMenuRadioGroup className="px-1 pb-1" value={view} onValueChange={handleViewChange}>
+												<DropdownMenuRadioItem value="table" onSelect={(e) => e.preventDefault()} className="gap-2">
+													<LayoutListIcon className="size-4" />
+													<Trans>Table</Trans>
+												</DropdownMenuRadioItem>
+												<DropdownMenuRadioItem value="charts" onSelect={(e) => e.preventDefault()} className="gap-2">
+													<ChartLineIcon className="size-4" />
+													<Trans>Charts</Trans>
+												</DropdownMenuRadioItem>
+											</DropdownMenuRadioGroup>
+										</div>
+									)}
 									<div className="border-r">
+										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+											<FilterIcon className="size-4" />
+											<Trans>Status</Trans>
+										</DropdownMenuLabel>
+										<DropdownMenuSeparator />
+										<DropdownMenuRadioGroup
+											className="px-1 pb-1"
+											value={statusFilter}
+											onValueChange={(value) => setStatusFilter(value as MonitorStatus | "all")}
+										>
+											<DropdownMenuRadioItem value="all" onSelect={(e) => e.preventDefault()}>
+												<Trans>All</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="up" onSelect={(e) => e.preventDefault()}>
+												<Trans>Up</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="down" onSelect={(e) => e.preventDefault()}>
+												<Trans>Down</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="pending" onSelect={(e) => e.preventDefault()}>
+												<Trans>Pending</Trans>
+											</DropdownMenuRadioItem>
+											<DropdownMenuRadioItem value="paused" onSelect={(e) => e.preventDefault()}>
+												<Trans>Paused</Trans>
+											</DropdownMenuRadioItem>
+										</DropdownMenuRadioGroup>
+									</div>
+									<div className={cn("border-r", showCharts && "hidden")}>
 										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
 											<ArrowUpDownIcon className="size-4" />
 											<Trans>Sort By</Trans>
@@ -398,7 +485,7 @@ export default function NetworkMonitorsTableNew({
 											})}
 										</div>
 									</div>
-									<div>
+									<div className={cn(showCharts && "hidden")}>
 										<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
 											<EyeIcon className="size-4" />
 											<Trans>Visible Fields</Trans>
@@ -470,17 +557,22 @@ export default function NetworkMonitorsTableNew({
 					</div>
 				</div>
 			</CardHeader>
-			<div className="rounded-md">
-				<NetworkMonitorsTable
-					table={table}
-					rows={rows}
-					colLength={visibleColumns.length}
-					visibleColumnsKey={visibleColumnsKey}
-					rowSelection={rowSelection}
-					isLoading={isLoading}
-					includesAllSystems={!systemId}
-				/>
-			</div>
+			{showCharts ? (
+				<NetworkMonitorsCharts monitors={chartMonitors} />
+			) : (
+				<div className="rounded-md">
+					<NetworkMonitorsTable
+						table={table}
+						rows={rows}
+						monitors={monitors}
+						colLength={visibleColumns.length}
+						visibleColumnsKey={visibleColumnsKey}
+						rowSelection={rowSelection}
+						isLoading={isLoading}
+						includesAllSystems={!systemId}
+					/>
+				</div>
+			)}
 		</Card>
 	)
 }
@@ -488,6 +580,7 @@ export default function NetworkMonitorsTableNew({
 const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 	table,
 	rows,
+	monitors,
 	colLength,
 	visibleColumnsKey,
 	rowSelection,
@@ -496,6 +589,8 @@ const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 }: {
 	table: TableType<NetworkMonitorRecord>
 	rows: Row<NetworkMonitorRecord>[]
+	/** Every monitor, including ones the status filter hides, for the sheet and its comparisons. */
+	monitors: NetworkMonitorRecord[]
 	colLength: number
 	visibleColumnsKey: string
 	rowSelection: RowSelectionState
@@ -506,9 +601,7 @@ const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const [sheetOpen, setSheetOpen] = useState(false)
 	const [activeMonitorId, setActiveMonitorId] = useState<string | null>(null)
-	const activeMonitor = activeMonitorId
-		? table.options.data.find((monitor) => monitor.id === activeMonitorId)
-		: undefined
+	const activeMonitor = activeMonitorId ? monitors.find((monitor) => monitor.id === activeMonitorId) : undefined
 	const openSheet = useCallback((monitor: NetworkMonitorRecord) => {
 		setActiveMonitorId(monitor.id)
 		setSheetOpen(true)
@@ -572,7 +665,7 @@ const NetworkMonitorsTable = memo(function NetworkMonitorTable({
 					setSheetOpen(nextOpen)
 				}}
 				monitor={activeMonitor}
-				monitors={table.options.data}
+				monitors={monitors}
 				includesAllSystems={includesAllSystems}
 			/>
 		</div>
