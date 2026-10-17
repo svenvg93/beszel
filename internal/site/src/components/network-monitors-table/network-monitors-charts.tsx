@@ -1,11 +1,10 @@
 import { Trans } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
 import { atom } from "nanostores"
-import { ChevronDownIcon } from "lucide-react"
 import { memo, useCallback, useMemo, useState } from "react"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
 import { ResponseLossChart } from "@/components/routes/system/charts/monitors-charts"
-import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getMonitorIdentityKey } from "@/lib/monitor-compare"
 import {
 	getMonitorLabels,
@@ -14,26 +13,45 @@ import {
 	PROTOCOLS,
 	withMonitorGaps,
 } from "@/lib/network-monitor-utils"
-import { useIntersectionObserver } from "@/lib/use-intersection-observer"
 import { $allSystemsById, $direction, getUserChartTime } from "@/lib/stores"
 import { useProtocolMonitorStats } from "@/lib/use-network-monitors"
-import { chartTimeData, cn, parseSemVer } from "@/lib/utils"
+import { chartTimeData, parseSemVer } from "@/lib/utils"
 import type { ChartOptions, ChartTimes, NetworkMonitorRecord, NetworkMonitorStatsRecord } from "@/types"
 import { SystemMultiSelect } from "./monitor-dialog"
 
-const COLLAPSED_STORAGE_KEY = "besz-monitor-charts-collapsed"
+const TAB_STORAGE_KEY = "besz-monitor-charts-tab"
 
-function loadCollapsed(): Set<string> {
+function loadTab(): Protocol | null {
 	try {
-		return new Set(JSON.parse(localStorage.getItem(COLLAPSED_STORAGE_KEY) || "[]"))
+		return localStorage.getItem(TAB_STORAGE_KEY) as Protocol | null
 	} catch {
-		return new Set()
+		return null
 	}
 }
 
+/** Groups monitors by what they probe, so each target gets a chart with a line per system. */
+function groupTargets(monitors: NetworkMonitorRecord[]) {
+	const byTarget = new Map<string, NetworkMonitorRecord[]>()
+	for (const monitor of monitors) {
+		const key = getMonitorIdentityKey(monitor)
+		const group = byTarget.get(key) ?? []
+		group.push(monitor)
+		byTarget.set(key, group)
+	}
+	const groups = [...byTarget.entries()].map(([key, group]) => ({ key, monitors: group }))
+	// Titles tell apart targets that differ only by DNS server or URL scheme.
+	const titles = getMonitorLabels(
+		groups.map(({ monitors }) => monitors[0]),
+		(_, target) => target
+	)
+	return groups
+		.map((group) => ({ ...group, title: titles.get(group.monitors[0].id) ?? group.monitors[0].target }))
+		.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }))
+}
+
 /**
- * Dashboard of response and loss charts for every monitor, one section per protocol.
- * `monitors` arrive already filtered by the table's text and status filters.
+ * Dashboard of response and loss charts for every target, with a tab per protocol like the system page.
+ * `monitors` arrive already filtered by the table's filters.
  */
 export default function NetworkMonitorsCharts({ monitors }: { monitors: NetworkMonitorRecord[] }) {
 	// Realtime isn't offered (see useProtocolMonitorStats), so fall back to 1h.
@@ -44,20 +62,7 @@ export default function NetworkMonitorsCharts({ monitors }: { monitors: NetworkM
 	const chartTime = useStore(chartTimeStore)
 	const direction = useStore($direction)
 	const [selectedSystemIds, setSelectedSystemIds] = useState<Set<string>>(() => new Set())
-	const [collapsed, setCollapsed] = useState(loadCollapsed)
-
-	const toggleSection = useCallback((protocol: Protocol) => {
-		setCollapsed((prev) => {
-			const next = new Set(prev)
-			if (!next.delete(protocol)) next.add(protocol)
-			try {
-				localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...next]))
-			} catch {
-				// collapse state just isn't remembered
-			}
-			return next
-		})
-	}, [])
+	const [storedTab, setStoredTab] = useState(loadTab)
 
 	const chartData = useMemo<ChartOptions>(
 		() => ({ agentVersion: parseSemVer(), orientation: direction === "rtl" ? "right" : "left", chartTime }),
@@ -66,7 +71,7 @@ export default function NetworkMonitorsCharts({ monitors }: { monitors: NetworkM
 
 	const systemIdsWithMonitors = useMemo(() => [...new Set(monitors.map((m) => m.system))], [monitors])
 
-	const monitorsByProtocol = useMemo(() => {
+	const targetsByProtocol = useMemo(() => {
 		const byProtocol = new Map<Protocol, NetworkMonitorRecord[]>()
 		for (const monitor of monitors) {
 			if (selectedSystemIds.size && !selectedSystemIds.has(monitor.system)) continue
@@ -74,115 +79,82 @@ export default function NetworkMonitorsCharts({ monitors }: { monitors: NetworkM
 			group.push(monitor)
 			byProtocol.set(monitor.protocol, group)
 		}
-		return byProtocol
+		return new Map([...byProtocol].map(([protocol, group]) => [protocol, groupTargets(group)]))
 	}, [monitors, selectedSystemIds])
 
-	const protocols = PROTOCOLS.filter((protocol) => monitorsByProtocol.has(protocol))
+	const protocols = PROTOCOLS.filter((protocol) => targetsByProtocol.has(protocol))
+	// Fall back to the first tab when the remembered protocol has no monitors (e.g. filtered out).
+	const activeTab = storedTab && protocols.includes(storedTab) ? storedTab : protocols[0]
+
+	const handleTabChange = useCallback((value: string) => {
+		setStoredTab(value as Protocol)
+		try {
+			localStorage.setItem(TAB_STORAGE_KEY, value)
+		} catch {
+			// the tab just isn't remembered
+		}
+	}, [])
 
 	return (
-		<div className="grid gap-4">
+		<Tabs value={activeTab} onValueChange={handleTabChange} className="contents">
 			<div className="flex flex-wrap items-center gap-2">
+				<TabsList className="h-11 p-1.5 shadow-xs overflow-auto justify-start flex-1 basis-full md:basis-0 min-w-0">
+					{protocols.map((protocol) => (
+						<TabsTrigger key={protocol} value={protocol} className="w-full flex items-center gap-1.5">
+							{PROTOCOL_LABELS[protocol]}
+						</TabsTrigger>
+					))}
+				</TabsList>
 				<SystemMultiSelect
 					id="monitor-charts-systems"
-					className="flex-1 min-w-0 basis-full sm:basis-0 sm:max-w-80 bg-card"
+					className="h-11 flex-1 min-w-0 basis-full sm:basis-0 md:max-w-64 bg-card"
 					systemIds={systemIdsWithMonitors}
 					selectedSystemIds={selectedSystemIds}
 					onChange={setSelectedSystemIds}
 					disabled={systemIdsWithMonitors.length < 2}
 				/>
 				<ChartTimeSelect
-					className="bg-card flex-1 min-w-0 basis-full sm:basis-0 sm:max-w-60 sm:ms-auto"
+					className="h-11 bg-card flex-1 min-w-0 basis-full sm:basis-0 md:max-w-48"
 					agentVersion={chartData.agentVersion}
 					chartTimeStore={chartTimeStore}
 					allowRealtime={false}
 				/>
 			</div>
-			{protocols.length ? (
-				protocols.map((protocol) => (
-					<ProtocolSection
-						key={protocol}
-						protocol={protocol}
-						monitors={monitorsByProtocol.get(protocol) ?? []}
-						chartData={chartData}
-						collapsed={collapsed.has(protocol)}
-						onToggle={toggleSection}
-					/>
-				))
+			{activeTab ? (
+				// Only the active tab is mounted, so only its protocol fetches; switching back reuses the cache.
+				<ProtocolCharts
+					key={activeTab}
+					protocol={activeTab}
+					targets={targetsByProtocol.get(activeTab) ?? []}
+					chartData={chartData}
+				/>
 			) : (
 				<p className="py-12 text-center text-sm text-muted-foreground">
 					<Trans>No results.</Trans>
 				</p>
 			)}
-		</div>
+		</Tabs>
 	)
 }
 
-const ProtocolSection = memo(function ProtocolSection({
+const ProtocolCharts = memo(function ProtocolCharts({
 	protocol,
-	monitors,
+	targets,
 	chartData,
-	collapsed,
-	onToggle,
 }: {
 	protocol: Protocol
-	monitors: NetworkMonitorRecord[]
+	targets: ReturnType<typeof groupTargets>
 	chartData: ChartOptions
-	collapsed: boolean
-	onToggle: (protocol: Protocol) => void
 }) {
 	// Stats cover the whole protocol, so filtering monitors doesn't refetch.
-	// Fetch once the section is near the viewport, like the system page's lazy tables. Stays loaded after.
-	const { isIntersecting, ref } = useIntersectionObserver({ rootMargin: "90px" })
-	const monitorStats = useProtocolMonitorStats(protocol, chartData.chartTime, !collapsed && isIntersecting)
-
-	// One chart per target, with a line for each system that probes it.
-	const targets = useMemo(() => {
-		const byTarget = new Map<string, NetworkMonitorRecord[]>()
-		for (const monitor of monitors) {
-			const key = getMonitorIdentityKey(monitor)
-			const group = byTarget.get(key) ?? []
-			group.push(monitor)
-			byTarget.set(key, group)
-		}
-		const groups = [...byTarget.entries()].map(([key, group]) => ({ key, monitors: group }))
-		// Titles tell apart targets that differ only by DNS server or URL scheme.
-		const titles = getMonitorLabels(
-			groups.map(({ monitors }) => monitors[0]),
-			(_, target) => target
-		)
-		return groups
-			.map((group) => ({ ...group, title: titles.get(group.monitors[0].id) ?? group.monitors[0].target }))
-			.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }))
-	}, [monitors])
+	const monitorStats = useProtocolMonitorStats(protocol, chartData.chartTime)
 
 	return (
-		<section ref={ref} className="grid gap-3">
-			<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-				<Button
-					variant="ghost"
-					className="-ms-2 px-2 gap-2 font-semibold"
-					aria-expanded={!collapsed}
-					onClick={() => onToggle(protocol)}
-				>
-					<ChevronDownIcon className={cn("size-4 transition-transform", { "-rotate-90": collapsed })} />
-					{PROTOCOL_LABELS[protocol]}
-					<span className="font-normal text-muted-foreground tabular-nums">{targets.length}</span>
-				</Button>
-			</div>
-			{!collapsed && (
-				<div className="grid xl:grid-cols-2 gap-4">
-					{targets.map(({ key, title, monitors }) => (
-						<TargetChart
-							key={key}
-							title={title}
-							monitors={monitors}
-							monitorStats={monitorStats}
-							chartData={chartData}
-						/>
-					))}
-				</div>
-			)}
-		</section>
+		<div className="grid xl:grid-cols-2 gap-4">
+			{targets.map(({ key, title, monitors }) => (
+				<TargetChart key={key} title={title} monitors={monitors} monitorStats={monitorStats} chartData={chartData} />
+			))}
+		</div>
 	)
 })
 

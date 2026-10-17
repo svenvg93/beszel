@@ -377,9 +377,9 @@ export default function NetworkMonitorsTableNew({
 	const visibleColumns = table.getVisibleLeafColumns()
 	const visibleColumnsKey = visibleColumns.map((column) => column.id).join(",")
 
-	return (
+	const card = (
 		<Card className="@container w-full px-3 py-5 sm:py-6 sm:px-6">
-			<CardHeader className="p-0 mb-3 sm:mb-4">
+			<CardHeader className={cn("p-0", !showCharts && "mb-3 sm:mb-4")}>
 				<div className="grid md-lg:flex gap-x-5 gap-y-3 w-full items-end">
 					<div className="px-2 sm:px-1">
 						<CardTitle className="mb-2">
@@ -593,11 +593,7 @@ export default function NetworkMonitorsTableNew({
 					</div>
 				</div>
 			</CardHeader>
-			{showCharts ? (
-				<Suspense fallback={<LoaderCircleIcon className="animate-spin size-10 opacity-60 mx-auto my-12" />}>
-					<NetworkMonitorsCharts monitors={chartMonitors} />
-				</Suspense>
-			) : (
+			{!showCharts && (
 				<div className="rounded-md">
 					<NetworkMonitorsTable
 						table={table}
@@ -612,6 +608,18 @@ export default function NetworkMonitorsTableNew({
 				</div>
 			)}
 		</Card>
+	)
+
+	if (!showCharts) return card
+
+	// Like the system page: the header card, then tabs and chart cards on the page background.
+	return (
+		<div className="grid gap-4">
+			{card}
+			<Suspense fallback={<LoaderCircleIcon className="animate-spin size-10 opacity-60 mx-auto my-12" />}>
+				<NetworkMonitorsCharts monitors={chartMonitors} />
+			</Suspense>
+		</div>
 	)
 }
 
