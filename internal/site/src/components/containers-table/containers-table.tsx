@@ -3,9 +3,12 @@ import { t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import {
 	type ColumnFiltersState,
+	type ExpandedState,
 	flexRender,
 	getCoreRowModel,
+	getExpandedRowModel,
 	getFilteredRowModel,
+	getGroupedRowModel,
 	getPaginationRowModel,
 	getSortedRowModel,
 	type Row,
@@ -28,8 +31,17 @@ import { Sheet, SheetTitle, SheetHeader, SheetContent, SheetDescription } from "
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog"
 import { Button } from "@/components/ui/button"
 import { $allSystemsById } from "@/lib/stores"
-import { LoaderCircleIcon, MaximizeIcon, RefreshCwIcon, XIcon } from "lucide-react"
+import { GroupIcon, LoaderCircleIcon, MaximizeIcon, RefreshCwIcon, Settings2Icon, XIcon } from "lucide-react"
 import { Separator } from "../ui/separator"
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { $router, Link } from "../router"
 import { listenKeys } from "nanostores"
 import { getPagePath } from "@nanostores/router"
@@ -49,18 +61,23 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
-	// Hide ports column if no ports are present
+	// Hide ports and stack columns if no container has them
 	useEffect(() => {
 		if (data) {
 			const hasPorts = data.some((container) => container.ports)
+			const hasStack = data.some((container) => container.stack)
 			setColumnVisibility((prev) => {
-				if (prev.ports === hasPorts) {
+				if (prev.ports === hasPorts && prev.stack === hasStack) {
 					return prev
 				}
-				return { ...prev, ports: hasPorts }
+				return { ...prev, ports: hasPorts, stack: hasStack }
 			})
 		}
 	}, [data])
+
+	const [groupByStack, setGroupByStack] = useBrowserStorage("group-c", false)
+	const [expanded, setExpanded] = useState<ExpandedState>({})
+	const grouped = groupByStack && !!columnVisibility.stack
 
 	const [rowSelection, setRowSelection] = useState({})
 	const [globalFilter, setGlobalFilter] = useState("")
@@ -70,7 +87,7 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 		function fetchData(systemId?: string) {
 			pb.collection<ContainerRecord>("containers")
 				.getList(0, 2000, {
-					fields: "id,name,image,updatable,ports,cpu,memory,net,health,status,system,updated",
+					fields: "id,name,image,updatable,ports,stack,cpu,memory,net,health,status,system,updated",
 					filter: systemId ? pb.filter("system={:system}", { system: systemId }) : undefined,
 				})
 				.then(({ items }) => {
@@ -128,8 +145,15 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
+		getGroupedRowModel: getGroupedRowModel(),
+		getExpandedRowModel: getExpandedRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		autoResetPageIndex: false,
+		// keep stacks open across the data refresh every minute
+		autoResetExpanded: false,
+		// the stack name is shown on the group row instead
+		groupedColumnMode: "remove",
+		onExpandedChange: setExpanded,
 		onPaginationChange,
 		onSortingChange: (updater) => {
 			setSorting(updater)
@@ -142,6 +166,10 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 			sortUndefined: "last",
 			size: 100,
 			minSize: 0,
+			// drop TanStack's defaults (auto aggregation shown as raw text), so stack rows
+			// only fill the columns that define how to aggregate
+			aggregatedCell: undefined,
+			aggregationFn: undefined,
 		},
 		state: {
 			sorting,
@@ -149,6 +177,8 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 			columnVisibility,
 			rowSelection,
 			globalFilter,
+			grouping: grouped ? ["stack"] : [],
+			expanded,
 			pagination,
 		},
 		onGlobalFilterChange: (value) => {
@@ -164,7 +194,9 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 			const healthLabel = ContainerHealthLabels[container.health as ContainerHealth] ?? ""
 			const image = container.image ?? ""
 			const ports = container.ports ?? ""
-			const searchString = `${systemName} ${id} ${name} ${healthLabel} ${status} ${image} ${ports}`.toLowerCase()
+			const stack = container.stack ?? ""
+			const searchString =
+				`${systemName} ${id} ${name} ${stack} ${healthLabel} ${status} ${image} ${ports}`.toLowerCase()
 
 			return (filterValue as string)
 				.toLowerCase()
@@ -188,24 +220,57 @@ export default function ContainersTable({ systemId }: { systemId?: string }) {
 							<Trans>Click on a container to view more information.</Trans>
 						</CardDescription>
 					</div>
-					<div className="relative ms-auto w-full max-w-full md:w-64">
-						<Input
-							placeholder={t`Filter...`}
-							value={globalFilter}
-							onChange={(e) => table.setGlobalFilter(e.target.value)}
-							className="ps-4 pe-10 w-full"
-						/>
-						{globalFilter && (
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon"
-								aria-label={t`Clear`}
-								className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
-								onClick={() => table.setGlobalFilter("")}
-							>
-								<XIcon className="h-4 w-4" />
-							</Button>
+					<div className="flex gap-2 ms-auto w-full max-w-full md:w-auto">
+						<div className="relative w-full md:w-64">
+							<Input
+								placeholder={t`Filter...`}
+								value={globalFilter}
+								onChange={(e) => table.setGlobalFilter(e.target.value)}
+								className="ps-4 pe-10 w-full"
+							/>
+							{globalFilter && (
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									aria-label={t`Clear`}
+									className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground"
+									onClick={() => table.setGlobalFilter("")}
+								>
+									<XIcon className="h-4 w-4" />
+								</Button>
+							)}
+						</div>
+						{columnVisibility.stack && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button aria-label={t`View`} variant="outline" size="icon" className="shrink-0">
+										<Settings2Icon className="size-4 opacity-80" />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end" className="min-w-48">
+									<DropdownMenuLabel className="pt-2 px-3.5 flex items-center gap-2">
+										<GroupIcon className="size-4" />
+										<Trans>Group By</Trans>
+									</DropdownMenuLabel>
+									<DropdownMenuSeparator />
+									<DropdownMenuRadioGroup
+										className="px-1 pb-1"
+										value={grouped ? "stack" : "none"}
+										onValueChange={(value) => {
+											setGroupByStack(value === "stack")
+											resetPageIndex()
+										}}
+									>
+										<DropdownMenuRadioItem value="none" onSelect={(e) => e.preventDefault()}>
+											<Trans>None</Trans>
+										</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="stack" onSelect={(e) => e.preventDefault()}>
+											<Trans context="Docker stack">Stack</Trans>
+										</DropdownMenuRadioItem>
+									</DropdownMenuRadioGroup>
+								</DropdownMenuContent>
+							</DropdownMenu>
 						)}
 					</div>
 				</div>
@@ -242,7 +307,16 @@ const AllContainersTable = memo(function AllContainersTable({
 				<ContainersTableHead table={table} />
 				<TableBody>
 					{rows.length ? (
-						rows.map((row) => <ContainerTableRow key={row.id} row={row} openSheet={openSheet} />)
+						rows.map((row) => {
+							if (!row.getIsGrouped()) {
+								return <ContainerTableRow key={row.id} row={row} openSheet={openSheet} />
+							}
+							// a container without a stack is grouped alone, so draw the container itself
+							if (!row.original.stack) {
+								return <ContainerTableRow key={row.id} row={row.subRows[0]} openSheet={openSheet} />
+							}
+							return <ContainerGroupRow key={row.id} row={row} />
+						})
 					) : (
 						<TableRow>
 							<TableCell colSpan={colLength} className="h-37 text-center pointer-events-none">
@@ -472,10 +546,10 @@ const ContainerTableRow = memo(function ContainerTableRow({
 			className="cursor-pointer transition-opacity"
 			onClick={() => openSheet(row.original)}
 		>
-			{row.getVisibleCells().map((cell) => (
+			{row.getVisibleCells().map((cell, i) => (
 				<TableCell
 					key={cell.id}
-					className="py-0 ps-4.5"
+					className={cn("py-0 ps-4.5", i === 0 && row.depth > 0 && row.original.stack && "ps-10")}
 					style={{
 						height: 54,
 						width: cell.column.getSize(),
@@ -487,6 +561,34 @@ const ContainerTableRow = memo(function ContainerTableRow({
 		</TableRow>
 	)
 })
+
+// Not memoized: it has to redraw when the row is expanded or collapsed
+function ContainerGroupRow({ row }: { row: Row<ContainerRecord> }) {
+	return (
+		<TableRow
+			className="cursor-pointer bg-muted/30"
+			aria-expanded={row.getIsExpanded()}
+			onClick={row.getToggleExpandedHandler()}
+		>
+			{row.getVisibleCells().map((cell) => {
+				const { aggregatedCell, aggregationFn, cell: leafCell } = cell.column.columnDef
+				const content = aggregatedCell ?? (aggregationFn ? leafCell : null)
+				return (
+					<TableCell
+						key={cell.id}
+						className="py-0 ps-4.5"
+						style={{
+							height: 54,
+							width: cell.column.getSize(),
+						}}
+					>
+						{content ? flexRender(content, cell.getContext()) : null}
+					</TableCell>
+				)
+			})}
+		</TableRow>
+	)
+}
 
 function InfoFullscreenDialog({
 	open,
