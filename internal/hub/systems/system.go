@@ -578,6 +578,8 @@ func (sys *System) updateNetworkMonitorsRecords(app core.App, monitorResults map
 			"total_count":   result.TotalCount,
 			"success_count": result.SuccessCount,
 			"res_sum":       result.ResponseSum,
+			"jitter_sum":    result.JitterSum,
+			"jitter_count":  result.JitterCount,
 		}
 		var err error
 		switch realtimeActive {

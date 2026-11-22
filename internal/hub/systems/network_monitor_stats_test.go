@@ -65,6 +65,7 @@ func TestNetworkMonitorResultOwnership(t *testing.T) {
 				LastProbeAt: 2000, AvgResponse: 22, AvgResponse1h: 33,
 				MinResponse1h: 11, MaxResponse1h: 44, PacketLoss1h: 50,
 				TotalCount: 2, SuccessCount: 1, ResponseSum: 22,
+				JitterSum: 9, JitterCount: 3,
 				Cert: &monitor.CertInfo{Expires: 1_800_000_000_000, Issuer: "Test CA"},
 			}
 			data := &system.CombinedData{Monitors: map[string]monitor.Result{
@@ -95,8 +96,11 @@ func TestNetworkMonitorResultOwnership(t *testing.T) {
 				assert.Equal(t, record.GetString("system"), stat.GetString("system"))
 				if record.Id == "foreign" {
 					assert.Equal(t, 77, stat.GetInt("res_sum"))
+					assert.Zero(t, stat.GetInt("jitter_count"))
 				} else {
 					assert.Equal(t, 22, stat.GetInt("res_sum"))
+					assert.Equal(t, 9, stat.GetInt("jitter_sum"))
+					assert.Equal(t, 3, stat.GetInt("jitter_count"))
 				}
 			}
 

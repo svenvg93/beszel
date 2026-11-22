@@ -73,7 +73,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
-import { LossChart, AvgMinMaxResponseChart, ResponseChart } from "@/components/routes/system/charts/monitors-charts"
+import { LossChart, AvgMinMaxResponseChart, JitterChart, ResponseChart } from "@/components/routes/system/charts/monitors-charts"
 import { getMonitorCompareState } from "@/lib/monitor-compare"
 import { useCompareMonitors, useNetworkMonitorStats } from "@/lib/use-network-monitors"
 import { useStore } from "@nanostores/react"
@@ -701,6 +701,8 @@ function NetworkMonitorSheetContent({
 	)
 	const { compareMonitors } = compare
 	const comparing = compareMonitors.length > 1
+	// only ICMP checks send several attempts, so other protocols have no jitter
+	const jitterMonitors = useMemo(() => compareMonitors.filter((m) => m.protocol === "icmp"), [compareMonitors])
 
 	const monitorStats = useNetworkMonitorStats({
 		systemId: monitor.system,
@@ -810,6 +812,17 @@ function NetworkMonitorSheetContent({
 								getLabel={compare.getLabel}
 								filterStore={compareFilterStore}
 							/>
+							{jitterMonitors.length > 0 && (
+								<JitterChart
+									monitorStats={monitorStats}
+									grid={false}
+									monitors={jitterMonitors}
+									chartData={chartData}
+									empty={!hasMonitorStats}
+									getLabel={compare.getLabel}
+									filterStore={compareFilterStore}
+								/>
+							)}
 						</>
 					) : (
 						<>
@@ -827,6 +840,16 @@ function NetworkMonitorSheetContent({
 								empty={!hasMonitorStats}
 								showFilter={false}
 							/>
+							{monitor.protocol === "icmp" && (
+								<JitterChart
+									monitorStats={monitorStats}
+									grid={false}
+									monitors={[monitor]}
+									chartData={chartData}
+									empty={!hasMonitorStats}
+									showFilter={false}
+								/>
+							)}
 						</>
 					)}
 				</div>

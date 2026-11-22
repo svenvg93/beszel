@@ -10,6 +10,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMonitorHistoryJitter(t *testing.T) {
+	now := time.Now()
+	burst := func(at time.Time, responses ...int64) []monitorSample {
+		samples := make([]monitorSample, len(responses))
+		for i, responseUs := range responses {
+			samples[i] = monitorSample{responseUs: responseUs, timestamp: at}
+		}
+		return samples
+	}
+
+	t.Run("consecutive replies within a burst, skipping losses", func(t *testing.T) {
+		history := newMonitorHistory()
+		history.recordAll(burst(now, 10, -1, 16, 13, -1))
+		for _, window := range []time.Duration{time.Minute, time.Hour} {
+			result, ok := history.result(window, now)
+			require.True(t, ok)
+			assert.EqualValues(t, 6+3, result.JitterSum, window)
+			assert.EqualValues(t, 2, result.JitterCount, window)
+		}
+
+		result, _ := history.result(time.Minute, now)
+		encoded, err := cbor.Marshal(result)
+		require.NoError(t, err)
+		var decoded monitor.Result
+		require.NoError(t, cbor.Unmarshal(encoded, &decoded))
+		assert.Equal(t, result, decoded)
+		stats := monitor.Stats{}.FromResult(decoded)
+		require.NotNil(t, stats.Jitter)
+		assert.Equal(t, 4.5, *stats.Jitter)
+	})
+
+	t.Run("bursts are not compared with each other", func(t *testing.T) {
+		history := newMonitorHistory()
+		history.recordAll(burst(now.Add(-20*time.Second), 10))
+		history.recordAll(burst(now.Add(-10*time.Second), 500, 520))
+		result, ok := history.result(time.Minute, now)
+		require.True(t, ok)
+		assert.EqualValues(t, 20, result.JitterSum)
+		assert.EqualValues(t, 1, result.JitterCount)
+	})
+
+	t.Run("single attempt checks report no jitter", func(t *testing.T) {
+		history := newMonitorHistory()
+		history.record(monitorSample{responseUs: 10, timestamp: now.Add(-time.Second)})
+		history.record(monitorSample{responseUs: 90, timestamp: now})
+		result, _ := history.result(time.Minute, now)
+		assert.Zero(t, result.JitterCount)
+		assert.Nil(t, monitor.Stats{}.FromResult(result).Jitter)
+	})
+
+	t.Run("a stable target reports zero jitter, not none", func(t *testing.T) {
+		history := newMonitorHistory()
+		history.recordAll(burst(now, 10, 10, 10))
+		stats := monitor.Stats{}.FromResult(mustMonitorResult(history.result(time.Minute, now)))
+		require.NotNil(t, stats.Jitter)
+		assert.Zero(t, *stats.Jitter)
+	})
+}
+
+func mustMonitorResult(result monitor.Result, ok bool) monitor.Result {
+	if !ok {
+		panic("no monitor result")
+	}
+	return result
+}
+
 func TestMonitorHistoryWindowCounts(t *testing.T) {
 	history := newMonitorHistory()
 	now := time.Now()

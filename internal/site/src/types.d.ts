@@ -725,6 +725,8 @@ export interface MonitorStats {
 	res_min: number | null
 	res_max: number | null
 	loss: number
+	/** Average jitter in microseconds; only set for monitors that send several attempts per check (ICMP). */
+	jitter?: number
 }
 
 /** Raw per-monitor record stored in the DB. */
@@ -734,6 +736,10 @@ export interface RawMonitorStatsRecord {
 	total_count: number
 	success_count: number
 	res_sum: number
+	/** Sum of RTT differences between consecutive replies, in microseconds. */
+	jitter_sum?: number
+	/** Number of RTT differences in jitter_sum. */
+	jitter_count?: number
 	id?: string
 	type?: string
 	monitor: string

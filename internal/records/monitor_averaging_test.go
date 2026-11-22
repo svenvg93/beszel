@@ -56,6 +56,7 @@ func TestAverageMonitorStats(t *testing.T) {
 		"res_min":     5,
 		"res_max":     20,
 		"total_count": 6, "success_count": 6, "res_sum": 60,
+		"jitter_sum": 40, "jitter_count": 4,
 	})
 	require.NoError(t, err)
 	recordB, err := tests.CreateRecord(hub, "network_monitor_stats", map[string]any{
@@ -66,13 +67,15 @@ func TestAverageMonitorStats(t *testing.T) {
 		"res_min":     10,
 		"res_max":     60,
 		"total_count": 1, "success_count": 1, "res_sum": 22,
+		"jitter_sum": 5, "jitter_count": 1,
 	})
 	require.NoError(t, err)
 
 	result, count, err := rm.AverageMonitorStats(hub.DB(), monitor.Id, "1m", created-1)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
-	assert.Equal(t, monitorEntity.Stats{ResAvg: 11.71, ResMin: 5, ResMax: 60, TotalCount: 7, SuccessCount: 7, ResponseSum: 82}, result)
+	assert.Equal(t, monitorEntity.Stats{ResAvg: 11.71, ResMin: 5, ResMax: 60, TotalCount: 7, SuccessCount: 7, ResponseSum: 82,
+		JitterSum: 45, JitterCount: 5}, result)
 
 	for _, tc := range []struct {
 		name, monitor, recordType string
@@ -95,11 +98,14 @@ func TestAverageMonitorStats(t *testing.T) {
 	recordB.Set("res_max", 0)
 	recordB.Set("success_count", 0)
 	recordB.Set("res_sum", 0)
+	recordB.Set("jitter_sum", 0)
+	recordB.Set("jitter_count", 0)
 	require.NoError(t, hub.Save(recordB))
 	result, count, err = rm.AverageMonitorStats(hub.DB(), monitor.Id, "1m", created-1)
 	require.NoError(t, err)
 	assert.Equal(t, 2, count)
-	assert.Equal(t, monitorEntity.Stats{ResAvg: 10, ResMin: 5, ResMax: 20, Loss: 14.29, TotalCount: 7, SuccessCount: 6, ResponseSum: 60}, result)
+	assert.Equal(t, monitorEntity.Stats{ResAvg: 10, ResMin: 5, ResMax: 20, Loss: 14.29, TotalCount: 7, SuccessCount: 6, ResponseSum: 60,
+		JitterSum: 40, JitterCount: 4}, result)
 	// Sparse monitor records must propagate through every rollup level.
 	rm.CreateLongerRecords()
 	for _, recordType := range []string{"10m", "20m", "120m", "480m"} {
@@ -111,6 +117,8 @@ func TestAverageMonitorStats(t *testing.T) {
 		assert.Equal(t, 7, rollups[0].GetInt("total_count"))
 		assert.Equal(t, 6, rollups[0].GetInt("success_count"))
 		assert.Equal(t, 60, rollups[0].GetInt("res_sum"))
+		assert.Equal(t, 40, rollups[0].GetInt("jitter_sum"), recordType)
+		assert.Equal(t, 4, rollups[0].GetInt("jitter_count"), recordType)
 		// A sibling with a different number of probes must retain its actual
 		// weight when the next tier combines their underlying counts.
 		_, err = tests.CreateRecord(hub, "network_monitor_stats", map[string]any{

@@ -282,3 +282,44 @@ export function LossChart({
 		/>
 	)
 }
+
+/** Average RTT variation between consecutive replies within each check. */
+export function JitterChart({
+	monitorStats,
+	grid,
+	monitors,
+	chartData,
+	empty,
+	titlePrefix,
+	getLabel,
+	filterStore,
+	showFilter,
+}: MonitorChartProps) {
+	const { t } = useLingui()
+	const jitterTitle = t`Jitter`
+	const title = titlePrefix ? `${titlePrefix} — ${jitterTitle}` : jitterTitle
+
+	return (
+		<MonitorChart
+			monitorStats={monitorStats}
+			grid={grid}
+			monitors={monitors}
+			chartData={chartData}
+			empty={empty}
+			metric="jitter"
+			title={title}
+			description={t`Average variation in response time between consecutive replies`}
+			color={monitors.length > 1 ? undefined : "var(--chart-2)"}
+			getLabel={getLabel}
+			filterStore={filterStore}
+			showFilter={showFilter}
+			tickFormatter={(value) => formatMicroseconds(value, false)}
+			contentFormatter={({ value }) => {
+				if (typeof value !== "number") {
+					return value
+				}
+				return formatMicroseconds(value)
+			}}
+		/>
+	)
+}

@@ -60,10 +60,23 @@ func (h *monitorHistory) record(sample monitorSample) monitor.Result {
 }
 
 // recordAll stores the samples of one probe and returns the result as of the last sample.
+//
+// The samples must be the attempts of a single burst in send order. Each
+// successful sample gets the jitter to the previous successful one, so lost
+// attempts are skipped rather than breaking the sequence. Samples from different
+// bursts are never compared, since they are a whole interval apart.
 func (h *monitorHistory) recordAll(samples []monitorSample) monitor.Result {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	prevUs := int64(-1)
 	for _, sample := range samples {
+		if sample.responseUs >= 0 {
+			if prevUs >= 0 {
+				sample.jitterUs = max(sample.responseUs-prevUs, prevUs-sample.responseUs)
+				sample.hasJitter = true
+			}
+			prevUs = sample.responseUs
+		}
 		h.addSampleLocked(sample)
 	}
 	result, _ := h.resultLocked(time.Minute, samples[len(samples)-1].timestamp)
@@ -74,6 +87,10 @@ func (h *monitorHistory) recordAll(samples []monitorSample) monitor.Result {
 type monitorSample struct {
 	responseUs int64 // -1 means loss
 	timestamp  time.Time
+	// jitterUs is the absolute RTT difference to the previous successful
+	// attempt of the same burst, set when hasJitter is true.
+	jitterUs  int64
+	hasJitter bool
 }
 
 // monitorBucket stores one minute of aggregated monitor data.
@@ -90,6 +107,10 @@ type monitorAggregate struct {
 	maxUs        int64
 	totalCount   int64
 	successCount int64
+	// jitterSumUs and jitterCount accumulate RTT differences between
+	// consecutive successful attempts within bursts.
+	jitterSumUs int64
+	jitterCount int64
 }
 
 // newMonitorAggregate initializes an aggregate with an unset minimum value.
@@ -97,7 +118,16 @@ func newMonitorAggregate() monitorAggregate {
 	return monitorAggregate{minUs: math.MaxInt64}
 }
 
-// addResponse folds a single monitor sample into the aggregate.
+// addSample folds a single monitor sample into the aggregate.
+func (agg *monitorAggregate) addSample(sample monitorSample) {
+	if sample.hasJitter {
+		agg.jitterSumUs += sample.jitterUs
+		agg.jitterCount++
+	}
+	agg.addResponse(sample.responseUs)
+}
+
+// addResponse folds a single response time into the aggregate.
 func (agg *monitorAggregate) addResponse(responseUs int64) {
 	agg.totalCount++
 	if responseUs < 0 {
@@ -121,6 +151,8 @@ func (agg *monitorAggregate) addAggregate(other monitorAggregate) {
 	agg.totalCount += other.totalCount
 	agg.successCount += other.successCount
 	agg.sumUs += other.sumUs
+	agg.jitterSumUs += other.jitterSumUs
+	agg.jitterCount += other.jitterCount
 	if other.successCount == 0 {
 		return
 	}
@@ -148,6 +180,8 @@ func (agg monitorAggregate) result() monitor.Result {
 		TotalCount:   agg.totalCount,
 		SuccessCount: agg.successCount,
 		ResponseSum:  agg.sumUs,
+		JitterSum:    agg.jitterSumUs,
+		JitterCount:  agg.jitterCount,
 	}
 	if agg.successCount == 0 {
 		result.MinResponse, result.MaxResponse = 0, 0
@@ -209,7 +243,7 @@ func (h *monitorHistory) latestSampleAggregateLocked() monitorAggregate {
 	if len(h.samples) == 0 {
 		return agg
 	}
-	agg.addResponse(h.samples[len(h.samples)-1].responseUs)
+	agg.addSample(h.samples[len(h.samples)-1])
 	return agg
 }
 
@@ -230,7 +264,7 @@ func aggregateSamplesSince(samples []monitorSample, cutoff time.Time) monitorAgg
 		if sample.timestamp.Before(cutoff) {
 			continue
 		}
-		agg.addResponse(sample.responseUs)
+		agg.addSample(sample)
 	}
 	return agg
 }
@@ -277,5 +311,5 @@ func (h *monitorHistory) addSampleLocked(sample monitorSample) {
 		bucket.filled = true
 		bucket.stats = newMonitorAggregate()
 	}
-	bucket.stats.addResponse(sample.responseUs)
+	bucket.stats.addSample(sample)
 }

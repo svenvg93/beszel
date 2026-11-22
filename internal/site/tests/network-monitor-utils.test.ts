@@ -60,6 +60,28 @@ describe("monitor stats derived from stored counts", () => {
 		})
 		expect(stats).toEqual({ res_avg: res, res_min: res, res_max: res, loss })
 	})
+
+	test("averages jitter over its own count, not the success count", () => {
+		const stats = getMonitorStats({
+			monitor: "monitor1",
+			created: 1000,
+			res_min: 5,
+			res_max: 20,
+			total_count: 10,
+			success_count: 10,
+			res_sum: 100,
+			jitter_sum: 25,
+			jitter_count: 8,
+		})
+		expect(stats.jitter).toBe(3.13)
+	})
+
+	test("keeps zero jitter but leaves it out without RTT differences", () => {
+		const base = { monitor: "monitor1", created: 1000, res_min: 5, res_max: 5, total_count: 3, success_count: 3, res_sum: 15 }
+		expect(getMonitorStats({ ...base, jitter_sum: 0, jitter_count: 2 }).jitter).toBe(0)
+		expect(getMonitorStats({ ...base, jitter_sum: 0, jitter_count: 0 })).not.toHaveProperty("jitter")
+		expect(getMonitorStats(base)).not.toHaveProperty("jitter")
+	})
 })
 
 describe("monitor gaps", () => {

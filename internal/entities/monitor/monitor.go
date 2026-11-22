@@ -125,6 +125,13 @@ type Result struct {
 	ResponseSum  int64 `cbor:"12,keyasint"`
 	// Cert is set for HTTPS targets when a certificate check has new info the hub has not stored yet.
 	Cert *CertInfo `cbor:"13,keyasint,omitempty"`
+	// JitterSum and JitterCount cover the same window as TotalCount. JitterSum
+	// adds up the absolute RTT differences, in microseconds, between consecutive
+	// successful attempts within each check; JitterCount is the number of such
+	// differences. Only checks with several attempts (ICMP) report jitter.
+	// Key 14 is reserved for HTTP phase timings.
+	JitterSum   int64 `cbor:"15,keyasint,omitempty"`
+	JitterCount int64 `cbor:"16,keyasint,omitempty"`
 }
 
 // Stats holds response times in microseconds and packet loss percentage (0-100).
@@ -136,6 +143,10 @@ type Stats struct {
 	TotalCount   int64   `json:"-" db:"total_count"`
 	SuccessCount int64   `json:"-" db:"success_count"`
 	ResponseSum  int64   `json:"-" db:"res_sum"`
+	JitterSum    int64   `json:"-" db:"jitter_sum"`
+	JitterCount  int64   `json:"-" db:"jitter_count"`
+	// Jitter is the average jitter in microseconds, derived for display; not stored.
+	Jitter *float64 `json:"jitter,omitempty" db:"-"`
 }
 
 func (s Stats) FromResult(result Result) Stats {
@@ -147,5 +158,18 @@ func (s Stats) FromResult(result Result) Stats {
 		TotalCount:   result.TotalCount,
 		SuccessCount: result.SuccessCount,
 		ResponseSum:  result.ResponseSum,
+		JitterSum:    result.JitterSum,
+		JitterCount:  result.JitterCount,
+		Jitter:       averageJitter(result.JitterSum, result.JitterCount),
 	}
+}
+
+// averageJitter returns the mean jitter in microseconds, or nil without any
+// RTT differences to average.
+func averageJitter(sum, count int64) *float64 {
+	if count == 0 {
+		return nil
+	}
+	jitter := float64(sum) / float64(count)
+	return &jitter
 }
