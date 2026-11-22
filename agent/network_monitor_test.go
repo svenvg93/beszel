@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -248,7 +249,7 @@ func TestMonitorHTTP(t *testing.T) {
 		}))
 		defer server.Close()
 
-		responseUs, err := monitorHTTP(context.Background(), server.Client(), monitor.Config{Target: server.URL})
+		responseUs, _, err := monitorHTTP(context.Background(), server.Client(), monitor.Config{Target: server.URL})
 		require.NoError(t, err)
 		assert.GreaterOrEqual(t, responseUs, int64(0))
 	})
@@ -259,9 +260,55 @@ func TestMonitorHTTP(t *testing.T) {
 		}))
 		defer server.Close()
 
-		responseUs, err := monitorHTTP(context.Background(), server.Client(), monitor.Config{Target: server.URL})
+		responseUs, _, err := monitorHTTP(context.Background(), server.Client(), monitor.Config{Target: server.URL})
 		assert.Equal(t, int64(-1), responseUs)
 		require.Error(t, err)
+	})
+
+	t.Run("phase timings with a new connection per check", func(t *testing.T) {
+		server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(5 * time.Millisecond)
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		var connections atomic.Int32
+		server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+			if state == http.StateNew {
+				connections.Add(1)
+			}
+		}
+		server.StartTLS()
+		defer server.Close()
+		probe := newMonitorManager(nil).probe
+		config := monitor.Config{Protocol: "http", Target: server.URL, SkipTLSVerify: true}
+
+		for range 2 {
+			probed, err := probe(context.Background(), config)
+			require.NoError(t, err)
+			require.NotNil(t, probed.timings)
+			assert.Zero(t, probed.timings.DNS, "IP target needs no lookup")
+			assert.Positive(t, probed.timings.TLS)
+			assert.GreaterOrEqual(t, probed.timings.Server, int64(5000))
+			assert.LessOrEqual(t, probed.timings.Connect+probed.timings.TLS+probed.timings.Server, probed.responseUs)
+		}
+		assert.Equal(t, int32(2), connections.Load(), "connections are not reused between checks")
+	})
+
+	t.Run("redirect hops add up", func(t *testing.T) {
+		var server *httptest.Server
+		server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(5 * time.Millisecond)
+			if r.URL.Path == "/" {
+				http.Redirect(w, r, server.URL+"/final", http.StatusFound)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		defer server.Close()
+
+		_, timings, err := monitorHTTP(context.Background(), newMonitorHTTPClient(monitor.IPVersionAuto, false), monitor.Config{Target: server.URL})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, timings.Server, int64(10000), "both hops count")
+		assert.Zero(t, timings.TLS, "plain HTTP has no handshake")
 	})
 
 	t.Run("accepted status codes", func(t *testing.T) {
@@ -272,18 +319,18 @@ func TestMonitorHTTP(t *testing.T) {
 		probe := networkMonitorProbe(staticMonitorHTTPClients(server.Client()))
 		config := monitor.Config{Protocol: "http", Target: server.URL}
 
-		responseUs, err := probe(context.Background(), config)
-		assert.Equal(t, int64(-1), responseUs)
+		probed, err := probe(context.Background(), config)
+		assert.Equal(t, int64(-1), probed.responseUs)
 		require.Error(t, err, "401 fails by default")
 
 		config.StatusCodes = "200-299,401"
-		responseUs, err = probe(context.Background(), config)
+		probed, err = probe(context.Background(), config)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, responseUs, int64(0))
+		assert.GreaterOrEqual(t, probed.responseUs, int64(0))
 
 		config.StatusCodes = "200-299"
-		responseUs, err = probe(context.Background(), config)
-		assert.Equal(t, int64(-1), responseUs)
+		probed, err = probe(context.Background(), config)
+		assert.Equal(t, int64(-1), probed.responseUs)
 		require.Error(t, err)
 	})
 
@@ -295,15 +342,28 @@ func TestMonitorHTTP(t *testing.T) {
 		probe := newMonitorManager(nil).probe
 		config := monitor.Config{Protocol: "http", Target: server.URL}
 
-		responseUs, err := probe(context.Background(), config)
-		assert.Equal(t, int64(-1), responseUs)
+		probed, err := probe(context.Background(), config)
+		assert.Equal(t, int64(-1), probed.responseUs)
 		require.Error(t, err)
 
 		config.SkipTLSVerify = true
-		responseUs, err = probe(context.Background(), config)
+		probed, err = probe(context.Background(), config)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, responseUs, int64(0))
+		assert.GreaterOrEqual(t, probed.responseUs, int64(0))
 	})
+}
+
+func TestHTTPTimingTraceConnectFallback(t *testing.T) {
+	var trace httpTimingTrace
+	hooks := trace.clientTrace()
+
+	hooks.ConnectStart("tcp", "[2001:db8::1]:443")
+	time.Sleep(2 * time.Millisecond)
+	hooks.ConnectDone("tcp", "[2001:db8::1]:443", errors.New("unreachable"))
+	hooks.ConnectStart("tcp", "192.0.2.1:443")
+	hooks.ConnectDone("tcp", "192.0.2.1:443", nil)
+
+	assert.GreaterOrEqual(t, trace.result().Connect, int64(2000), "measured from the first attempt")
 }
 
 func TestHTTPStatusAccepted(t *testing.T) {
@@ -413,8 +473,8 @@ func TestMonitorHTTPIPVersion(t *testing.T) {
 
 	// The IPv6 client must not reuse the idle IPv4 connection from the previous request.
 	config.IPVersion = monitor.IPVersion6
-	responseUs, err := probe(t.Context(), config)
-	assert.Equal(t, int64(-1), responseUs)
+	probed, err := probe(t.Context(), config)
+	assert.Equal(t, int64(-1), probed.responseUs)
 	require.Error(t, err)
 
 	config.IPVersion = 5

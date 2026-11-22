@@ -67,6 +67,7 @@ func (h *monitorHistory) record(sample monitorSample) monitor.Result {
 type monitorSample struct {
 	responseUs int64 // -1 means loss
 	timestamp  time.Time
+	timings    monitor.HTTPTimings // zero for failed and non-HTTP checks
 }
 
 // monitorBucket stores one minute of aggregated monitor data.
@@ -83,6 +84,7 @@ type monitorAggregate struct {
 	maxUs        int64
 	totalCount   int64
 	successCount int64
+	timings      monitor.HTTPTimings // sums over successful samples
 }
 
 // newMonitorAggregate initializes an aggregate with an unset minimum value.
@@ -90,14 +92,16 @@ func newMonitorAggregate() monitorAggregate {
 	return monitorAggregate{minUs: math.MaxInt64}
 }
 
-// addResponse folds a single monitor sample into the aggregate.
-func (agg *monitorAggregate) addResponse(responseUs int64) {
+// addSample folds a single monitor sample into the aggregate.
+func (agg *monitorAggregate) addSample(sample monitorSample) {
 	agg.totalCount++
+	responseUs := sample.responseUs
 	if responseUs < 0 {
 		return
 	}
 	agg.successCount++
 	agg.sumUs += responseUs
+	agg.timings.Add(sample.timings)
 	if responseUs < agg.minUs {
 		agg.minUs = responseUs
 	}
@@ -114,6 +118,7 @@ func (agg *monitorAggregate) addAggregate(other monitorAggregate) {
 	agg.totalCount += other.totalCount
 	agg.successCount += other.successCount
 	agg.sumUs += other.sumUs
+	agg.timings.Add(other.timings)
 	if other.successCount == 0 {
 		return
 	}
@@ -144,6 +149,10 @@ func (agg monitorAggregate) result() monitor.Result {
 	}
 	if agg.successCount == 0 {
 		result.MinResponse, result.MaxResponse = 0, 0
+	}
+	if !agg.timings.IsZero() {
+		timings := agg.timings
+		result.Timings = &timings
 	}
 	return result
 }
@@ -202,7 +211,7 @@ func (h *monitorHistory) latestSampleAggregateLocked() monitorAggregate {
 	if len(h.samples) == 0 {
 		return agg
 	}
-	agg.addResponse(h.samples[len(h.samples)-1].responseUs)
+	agg.addSample(h.samples[len(h.samples)-1])
 	return agg
 }
 
@@ -223,7 +232,7 @@ func aggregateSamplesSince(samples []monitorSample, cutoff time.Time) monitorAgg
 		if sample.timestamp.Before(cutoff) {
 			continue
 		}
-		agg.addResponse(sample.responseUs)
+		agg.addSample(sample)
 	}
 	return agg
 }
@@ -270,5 +279,5 @@ func (h *monitorHistory) addSampleLocked(sample monitorSample) {
 		bucket.filled = true
 		bucket.stats = newMonitorAggregate()
 	}
-	bucket.stats.addResponse(sample.responseUs)
+	bucket.stats.addSample(sample)
 }

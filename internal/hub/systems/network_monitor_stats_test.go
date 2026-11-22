@@ -65,7 +65,8 @@ func TestNetworkMonitorResultOwnership(t *testing.T) {
 				LastProbeAt: 2000, AvgResponse: 22, AvgResponse1h: 33,
 				MinResponse1h: 11, MaxResponse1h: 44, PacketLoss1h: 50,
 				TotalCount: 2, SuccessCount: 1, ResponseSum: 22,
-				Cert: &monitor.CertInfo{Expires: 1_800_000_000_000, Issuer: "Test CA"},
+				Cert:    &monitor.CertInfo{Expires: 1_800_000_000_000, Issuer: "Test CA"},
+				Timings: &monitor.HTTPTimings{DNS: 1, Connect: 2, TLS: 3, Server: 4},
 			}
 			data := &system.CombinedData{Monitors: map[string]monitor.Result{
 				"owned": result, "disabled": result, "foreign": result, "nonexistent": result,
@@ -95,8 +96,10 @@ func TestNetworkMonitorResultOwnership(t *testing.T) {
 				assert.Equal(t, record.GetString("system"), stat.GetString("system"))
 				if record.Id == "foreign" {
 					assert.Equal(t, 77, stat.GetInt("res_sum"))
+					assert.Zero(t, stat.GetInt("server_sum"), "no timings without an HTTP result")
 				} else {
 					assert.Equal(t, 22, stat.GetInt("res_sum"))
+					assert.Equal(t, []int{1, 2, 3, 4}, []int{stat.GetInt("dns_sum"), stat.GetInt("connect_sum"), stat.GetInt("tls_sum"), stat.GetInt("server_sum")})
 				}
 			}
 

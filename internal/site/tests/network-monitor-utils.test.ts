@@ -60,6 +60,40 @@ describe("monitor stats derived from stored counts", () => {
 		})
 		expect(stats).toEqual({ res_avg: res, res_min: res, res_max: res, loss })
 	})
+
+	test("averages HTTP phase timings over successful checks", () => {
+		const stats = getMonitorStats({
+			monitor: "monitor1",
+			created: 1000,
+			res_min: 5,
+			res_max: 20,
+			total_count: 4,
+			success_count: 3,
+			res_sum: 60,
+			dns_sum: 0,
+			connect_sum: 10,
+			tls_sum: 20,
+			server_sum: 25,
+		})
+		expect(stats).toMatchObject({ dns: 0, connect: 3.33, tls: 6.67, server: 8.33 })
+	})
+
+	test("leaves out phase timings for non-HTTP monitors", () => {
+		const stats = getMonitorStats({
+			monitor: "monitor1",
+			created: 1000,
+			res_min: 5,
+			res_max: 20,
+			total_count: 1,
+			success_count: 1,
+			res_sum: 5,
+			dns_sum: 0,
+			connect_sum: 0,
+			tls_sum: 0,
+			server_sum: 0,
+		})
+		expect(stats).not.toHaveProperty("server")
+	})
 })
 
 describe("monitor gaps", () => {

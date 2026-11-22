@@ -125,6 +125,35 @@ type Result struct {
 	ResponseSum  int64 `cbor:"12,keyasint"`
 	// Cert is set for HTTPS targets when a certificate check has new info the hub has not stored yet.
 	Cert *CertInfo `cbor:"13,keyasint,omitempty"`
+	// Timings sums the phase durations of the successful HTTP checks counted in
+	// SuccessCount, like ResponseSum. Nil for other protocols.
+	Timings *HTTPTimings `cbor:"14,keyasint,omitempty"`
+}
+
+// HTTPTimings holds the time spent in each phase of an HTTP check, in
+// microseconds. Phases of redirect hops are added together.
+type HTTPTimings struct {
+	// DNS is the host name lookup. Zero when the target is an IP address.
+	DNS int64 `cbor:"0,keyasint,omitempty"`
+	// Connect is TCP connection setup, including fallback to other addresses.
+	Connect int64 `cbor:"1,keyasint,omitempty"`
+	// TLS is the TLS handshake. Zero for plain HTTP.
+	TLS int64 `cbor:"2,keyasint,omitempty"`
+	// Server is the time from sending the request to the first response byte.
+	Server int64 `cbor:"3,keyasint,omitempty"`
+}
+
+// Add adds the phase durations of other to t.
+func (t *HTTPTimings) Add(other HTTPTimings) {
+	t.DNS += other.DNS
+	t.Connect += other.Connect
+	t.TLS += other.TLS
+	t.Server += other.Server
+}
+
+// IsZero reports whether no phase has any time recorded.
+func (t HTTPTimings) IsZero() bool {
+	return t == HTTPTimings{}
 }
 
 // Stats holds response times in microseconds and packet loss percentage (0-100).
@@ -136,10 +165,20 @@ type Stats struct {
 	TotalCount   int64   `json:"-" db:"total_count"`
 	SuccessCount int64   `json:"-" db:"success_count"`
 	ResponseSum  int64   `json:"-" db:"res_sum"`
+	// Sums of HTTP phase durations over successful checks, in microseconds.
+	DNSSum     int64 `json:"-" db:"dns_sum"`
+	ConnectSum int64 `json:"-" db:"connect_sum"`
+	TLSSum     int64 `json:"-" db:"tls_sum"`
+	ServerSum  int64 `json:"-" db:"server_sum"`
+	// Average HTTP phase durations, derived from the sums for realtime display.
+	DNS     float64 `json:"dns,omitempty" db:"-"`
+	Connect float64 `json:"connect,omitempty" db:"-"`
+	TLS     float64 `json:"tls,omitempty" db:"-"`
+	Server  float64 `json:"server,omitempty" db:"-"`
 }
 
 func (s Stats) FromResult(result Result) Stats {
-	return Stats{
+	stats := Stats{
 		ResAvg:       float64(result.AvgResponse),
 		ResMin:       float64(result.MinResponse),
 		ResMax:       float64(result.MaxResponse),
@@ -148,4 +187,15 @@ func (s Stats) FromResult(result Result) Stats {
 		SuccessCount: result.SuccessCount,
 		ResponseSum:  result.ResponseSum,
 	}
+	if t := result.Timings; t != nil {
+		stats.DNSSum, stats.ConnectSum, stats.TLSSum, stats.ServerSum = t.DNS, t.Connect, t.TLS, t.Server
+		if result.SuccessCount > 0 {
+			n := float64(result.SuccessCount)
+			stats.DNS = float64(t.DNS) / n
+			stats.Connect = float64(t.Connect) / n
+			stats.TLS = float64(t.TLS) / n
+			stats.Server = float64(t.Server) / n
+		}
+	}
+	return stats
 }

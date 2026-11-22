@@ -73,7 +73,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import ChartTimeSelect from "@/components/charts/chart-time-select"
-import { LossChart, AvgMinMaxResponseChart, ResponseChart } from "@/components/routes/system/charts/monitors-charts"
+import { LossChart, AvgMinMaxResponseChart, HttpTimingsChart, ResponseChart } from "@/components/routes/system/charts/monitors-charts"
 import { getMonitorCompareState } from "@/lib/monitor-compare"
 import { useCompareMonitors, useNetworkMonitorStats } from "@/lib/use-network-monitors"
 import { useStore } from "@nanostores/react"
@@ -819,6 +819,14 @@ function NetworkMonitorSheetContent({
 								chartData={chartData}
 								empty={!hasMonitorStats}
 							/>
+							{monitor.protocol === "http" && (
+								<HttpTimingsChart
+									monitorStats={monitorStats}
+									monitor={monitor}
+									chartData={chartData}
+									empty={!hasMonitorStats}
+								/>
+							)}
 							<LossChart
 								monitorStats={monitorStats}
 								grid={false}

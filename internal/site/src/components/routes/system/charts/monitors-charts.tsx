@@ -1,6 +1,8 @@
 import { getMonitorTarget, monitorGapRecord } from "@/lib/network-monitor-utils"
 import LineChartDefault from "@/components/charts/line-chart"
 import type { DataPoint } from "@/components/charts/line-chart"
+import AreaChartDefault from "@/components/charts/area-chart"
+import type { DataPoint as AreaDataPoint } from "@/components/charts/area-chart"
 import { decimalString, formatMicroseconds, matchesFilterGroups, parseFilterGroups, toFixedFloat } from "@/lib/utils"
 import { $monitorFilter } from "@/lib/stores"
 import { useLingui } from "@lingui/react/macro"
@@ -197,6 +199,49 @@ export function AvgMinMaxResponseChart({ monitorStats, monitor, chartData, empty
 					}
 					return formatMicroseconds(value)
 				}}
+			/>
+		</ChartCard>
+	)
+}
+
+/** Time spent in each phase of an HTTP check, stacked so the total matches the response time. */
+export function HttpTimingsChart({ monitorStats, monitor, chartData, empty }: AvgMinMaxResponseChartProps) {
+	const { t } = useLingui()
+
+	const dataPoints: AreaDataPoint<NetworkMonitorStatsRecord>[] = useMemo(() => {
+		const id = monitor?.id ?? ""
+		const phase = (metric: "dns" | "connect" | "tls" | "server", label: string, color: number) => ({
+			label,
+			dataKey: (record: NetworkMonitorStatsRecord) => record.stats?.[id]?.[metric] ?? null,
+			color,
+			opacity: 0.4,
+			stackId: "phases",
+		})
+		return [
+			phase("dns", "DNS", 1),
+			phase("connect", t`Connect`, 2),
+			phase("tls", "TLS", 3),
+			phase("server", t({ message: "Server", context: "HTTP time to first byte" }), 4),
+		]
+	}, [monitor?.id, t])
+
+	return (
+		<ChartCard
+			legend={true}
+			empty={empty}
+			title={t`Response breakdown`}
+			description={t`Average time for DNS lookup, connection, TLS handshake, and server response`}
+			grid={false}
+		>
+			<AreaChartDefault
+				truncate
+				chartData={chartData}
+				customData={monitorStats}
+				dataPoints={dataPoints}
+				legend={true}
+				showTotal={true}
+				tickFormatter={(value) => formatMicroseconds(value, false)}
+				contentFormatter={({ value }) => (typeof value === "number" ? formatMicroseconds(value) : value)}
 			/>
 		</ChartCard>
 	)

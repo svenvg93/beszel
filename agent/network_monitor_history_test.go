@@ -10,6 +10,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMonitorHistoryHTTPTimings(t *testing.T) {
+	history := newMonitorHistory()
+	now := time.Now()
+	history.record(monitorSample{responseUs: 100, timestamp: now.Add(-30 * time.Second),
+		timings: monitor.HTTPTimings{DNS: 10, Connect: 20, TLS: 30, Server: 40}})
+	history.record(monitorSample{responseUs: 200, timestamp: now.Add(-20 * time.Second),
+		timings: monitor.HTTPTimings{Connect: 50, TLS: 60, Server: 90}})
+	history.record(monitorSample{responseUs: -1, timestamp: now.Add(-10 * time.Second)})
+
+	want := monitor.HTTPTimings{DNS: 10, Connect: 70, TLS: 90, Server: 130}
+	for _, window := range []time.Duration{time.Minute, time.Hour} {
+		result, ok := history.result(window, now)
+		require.True(t, ok)
+		require.NotNil(t, result.Timings, window)
+		assert.Equal(t, want, *result.Timings, window)
+	}
+
+	result, _ := history.result(time.Minute, now)
+	encoded, err := cbor.Marshal(result)
+	require.NoError(t, err)
+	var decoded monitor.Result
+	require.NoError(t, cbor.Unmarshal(encoded, &decoded))
+	assert.Equal(t, result, decoded)
+
+	stats := monitor.Stats{}.FromResult(decoded)
+	assert.EqualValues(t, 70, stats.ConnectSum)
+	assert.Equal(t, 35.0, stats.Connect, "average over the two successful checks")
+	assert.Equal(t, 65.0, stats.Server)
+
+	plain := newMonitorHistory()
+	plain.record(monitorSample{responseUs: 100, timestamp: now})
+	result, _ = plain.result(time.Minute, now)
+	assert.Nil(t, result.Timings, "non-HTTP monitors send no timings")
+}
+
 func TestMonitorHistoryWindowCounts(t *testing.T) {
 	history := newMonitorHistory()
 	now := time.Now()

@@ -86,14 +86,18 @@ func (task *monitorTask) runProbe(probe monitorProbe) *monitor.Result {
 	task.runMu.Unlock()
 
 	generation, _ := task.resumeGuard.snapshot()
-	responseUs, err := probe(task.ctx, task.config)
+	probed, err := probe(task.ctx, task.config)
 	var logFailure bool
 	task.runMu.Lock()
 	currentGeneration, _ := task.resumeGuard.snapshot()
 	if task.ctx.Err() == nil && generation == currentGeneration {
 		now := time.Now()
+		sample := monitorSample{responseUs: probed.responseUs, timestamp: now}
+		if probed.timings != nil {
+			sample.timings = *probed.timings
+		}
 		if err != nil {
-			responseUs = -1
+			sample = monitorSample{responseUs: -1, timestamp: now}
 			logAt := now.UnixNano()
 			if task.lastFailureLog == 0 || logAt < task.lastFailureLog || logAt-task.lastFailureLog >= int64(monitorFailureLogInterval) {
 				logFailure = true
@@ -102,7 +106,7 @@ func (task *monitorTask) runProbe(probe monitorProbe) *monitor.Result {
 		} else {
 			task.lastFailureLog = 0
 		}
-		result := task.history.record(monitorSample{responseUs: responseUs, timestamp: now})
+		result := task.history.record(sample)
 		run.result = &result
 	}
 

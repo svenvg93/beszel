@@ -10,7 +10,7 @@ import { toFixedFloat } from "./utils"
 /** Derive chart metrics from the counts and response sum stored at every retention tier. */
 export function getMonitorStats(record: RawMonitorStatsRecord): MonitorStats {
 	const success = record.success_count > 0
-	return {
+	const stats: MonitorStats = {
 		res_avg: success ? toFixedFloat(record.res_sum / record.success_count, 2) : null,
 		res_min: success ? record.res_min : null,
 		res_max: success ? record.res_max : null,
@@ -19,6 +19,16 @@ export function getMonitorStats(record: RawMonitorStatsRecord): MonitorStats {
 				? toFixedFloat(((record.total_count - record.success_count) / record.total_count) * 100, 2)
 				: 0,
 	}
+	const { dns_sum = 0, connect_sum = 0, tls_sum = 0, server_sum = 0 } = record
+	// only HTTP checks record phase timings
+	if (success && dns_sum + connect_sum + tls_sum + server_sum > 0) {
+		const avg = (sum: number) => toFixedFloat(sum / record.success_count, 2)
+		stats.dns = avg(dns_sum)
+		stats.connect = avg(connect_sum)
+		stats.tls = avg(tls_sum)
+		stats.server = avg(server_sum)
+	}
+	return stats
 }
 
 /**

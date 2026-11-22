@@ -236,6 +236,10 @@ func (rm *RecordManager) CreateLongerRecords() {
 				longerRecord.Set("total_count", stats.TotalCount)
 				longerRecord.Set("success_count", stats.SuccessCount)
 				longerRecord.Set("res_sum", stats.ResponseSum)
+				longerRecord.Set("dns_sum", stats.DNSSum)
+				longerRecord.Set("connect_sum", stats.ConnectSum)
+				longerRecord.Set("tls_sum", stats.TLSSum)
+				longerRecord.Set("server_sum", stats.ServerSum)
 				if err := txApp.SaveNoValidate(longerRecord); err != nil {
 					txApp.Logger().Error("failed to save monitor longer record", "err", err)
 				}
@@ -710,6 +714,10 @@ func (rm *RecordManager) AverageMonitorStats(db dbx.Builder, monitorID, recordTy
 		"COALESCE(SUM(total_count), 0) AS total_count",
 		"COALESCE(SUM(success_count), 0) AS success_count",
 		"COALESCE(SUM(res_sum), 0) AS res_sum",
+		"COALESCE(SUM(dns_sum), 0) AS dns_sum",
+		"COALESCE(SUM(connect_sum), 0) AS connect_sum",
+		"COALESCE(SUM(tls_sum), 0) AS tls_sum",
+		"COALESCE(SUM(server_sum), 0) AS server_sum",
 		"COALESCE(MIN(CASE WHEN success_count > 0 THEN res_min END), 0) AS res_min",
 		"COALESCE(MAX(CASE WHEN success_count > 0 THEN res_max END), 0) AS res_max",
 	).From("network_monitor_stats").Where(dbx.NewExp(

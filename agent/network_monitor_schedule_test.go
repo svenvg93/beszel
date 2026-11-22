@@ -72,11 +72,11 @@ func TestMonitorScheduledAndImmediateRequestsShareProbe(t *testing.T) {
 		var calls atomic.Int32
 		release := make(chan struct{})
 		cfg := monitor.Config{ID: "test", Interval: 10}
-		pm := newMonitorManagerWithProbe(func(ctx context.Context, config monitor.Config) (int64, error) {
+		pm := newMonitorManagerWithProbe(func(ctx context.Context, config monitor.Config) (probeResult, error) {
 			assert.Equal(t, cfg, config)
 			calls.Add(1)
 			<-release
-			return 42, nil
+			return probeResult{responseUs: 42}, nil
 		})
 		defer pm.Stop()
 		task := newMonitorTask(cfg)
@@ -113,12 +113,12 @@ func TestMonitorScheduledAndImmediateRequestsShareProbe(t *testing.T) {
 func TestMonitorReplacementCancelsSharedProbe(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		cfg := monitor.Config{ID: "test", Interval: 10}
-		pm := newMonitorManagerWithProbe(func(ctx context.Context, config monitor.Config) (int64, error) {
+		pm := newMonitorManagerWithProbe(func(ctx context.Context, config monitor.Config) (probeResult, error) {
 			if config.Interval == 10 {
 				<-ctx.Done()
-				return 0, ctx.Err()
+				return probeResult{responseUs: 0}, ctx.Err()
 			}
-			return 30, nil
+			return probeResult{responseUs: 30}, nil
 		})
 		defer pm.Stop()
 		task := newMonitorTask(cfg)
@@ -149,11 +149,11 @@ func TestMonitorReplacementCancelsSharedProbe(t *testing.T) {
 
 func TestMonitorInjectedProbeTimeoutRecordsLoss(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		pm := newMonitorManagerWithProbe(func(ctx context.Context, _ monitor.Config) (int64, error) {
+		pm := newMonitorManagerWithProbe(func(ctx context.Context, _ monitor.Config) (probeResult, error) {
 			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
 			<-ctx.Done()
-			return 0, ctx.Err()
+			return probeResult{responseUs: 0}, ctx.Err()
 		})
 		defer pm.Stop()
 		start := time.Now()
@@ -169,9 +169,9 @@ func TestMonitorInjectedProbeTimeoutRecordsLoss(t *testing.T) {
 func TestMonitorScheduleSkipsProbesWhileHubIdle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var calls atomic.Int32
-		pm := newMonitorManagerWithProbe(func(context.Context, monitor.Config) (int64, error) {
+		pm := newMonitorManagerWithProbe(func(context.Context, monitor.Config) (probeResult, error) {
 			calls.Add(1)
-			return 42, nil
+			return probeResult{responseUs: 42}, nil
 		})
 		defer pm.Stop()
 		a := &Agent{}

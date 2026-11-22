@@ -10,7 +10,7 @@ import {
 	xAxis,
 } from "@/components/ui/chart"
 import { chartMargin, cn, formatShortDate } from "@/lib/utils"
-import type { ChartData, SystemStatsRecord } from "@/types"
+import type { ChartOptions, SystemStatsRecord } from "@/types"
 import { hasChartValues, useYAxisWidth } from "./hooks"
 import { ChartNoValues } from "./chart-no-values"
 import type { AxisDomain } from "recharts/types/util/types"
@@ -45,7 +45,7 @@ export default function AreaChartDefault({
 	truncate = false,
 	chartProps,
 }: {
-	chartData: ChartData
+	chartData: ChartOptions & { systemStats?: SystemStatsRecord[] }
 	// biome-ignore lint/suspicious/noExplicitAny: accepts different data source types (systemStats or containerData)
 	customData?: any[]
 	max?: number

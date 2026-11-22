@@ -725,6 +725,11 @@ export interface MonitorStats {
 	res_min: number | null
 	res_max: number | null
 	loss: number
+	/** Average HTTP phase durations in microseconds; only set for HTTP monitors. */
+	dns?: number
+	connect?: number
+	tls?: number
+	server?: number
 }
 
 /** Raw per-monitor record stored in the DB. */
@@ -734,6 +739,11 @@ export interface RawMonitorStatsRecord {
 	total_count: number
 	success_count: number
 	res_sum: number
+	/** Sums of HTTP phase durations over successful checks, in microseconds. */
+	dns_sum?: number
+	connect_sum?: number
+	tls_sum?: number
+	server_sum?: number
 	id?: string
 	type?: string
 	monitor: string

@@ -579,6 +579,12 @@ func (sys *System) updateNetworkMonitorsRecords(app core.App, monitorResults map
 			"success_count": result.SuccessCount,
 			"res_sum":       result.ResponseSum,
 		}
+		if t := result.Timings; t != nil {
+			statsRecordData["dns_sum"] = t.DNS
+			statsRecordData["connect_sum"] = t.Connect
+			statsRecordData["tls_sum"] = t.TLS
+			statsRecordData["server_sum"] = t.Server
+		}
 		var err error
 		switch realtimeActive {
 		case true:
